@@ -1,6 +1,5 @@
 #!/bin/sh
 
-./build
+./install || exit 1
 
-# TODO
-echo 'TODO'
+gulp --cwd ./project watch

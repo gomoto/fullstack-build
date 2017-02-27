@@ -766,6 +766,11 @@ function build(done, includeMaps) {
   ], done);
 }
 
+function watch(callback, includeMaps) {
+  watchClient(callback);
+  watchServer(callback, !!includeMaps);
+}
+
 gulp.task('clean', (done) => {
   fsExtra.remove(paths.app.directory, done);
 });
@@ -773,6 +778,13 @@ gulp.task('clean', (done) => {
 // If we use gulp subtasks, the time report for this task is not useful.
 gulp.task('build', ['clean'], (done) => {
   build(done);
+});
+
+gulp.task('watch', ['clean'], (done) => {
+  build(() => {
+    watch();
+    done();
+  });
 });
 
 
@@ -887,7 +899,7 @@ function serve(done, debug) {
  * @param {Function} done called after servers have launched
  * @param {boolean} debug activates node debug mode and sourcemaps
  */
-function watch(done, debug) {
+function dev(done, debug) {
   done = done || noop;
   debug = !!debug;
 
@@ -910,11 +922,11 @@ function watch(done, debug) {
 }
 
 gulp.task('dev', ['clean'], (done) => {
-  watch(done, false);
+  dev(done, false);
 });
 
 gulp.task('dev:debug', ['clean'], (done) => {
-  watch(done, true);
+  dev(done, true);
 })
 
 
