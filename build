@@ -1,0 +1,5 @@
+#!/bin/sh
+
+./install || exit 1
+
+gulp --cwd ./project build
