@@ -2,4 +2,4 @@
 
 ./install || exit 1
 
-gulp --cwd ./project build
+gulp --gulpfile ./gulpfile.js --cwd ./project build
