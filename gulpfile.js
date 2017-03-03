@@ -86,7 +86,8 @@ const config = {
     ts: {
       entry: `${names.client}/src/index.ts`,
       bundle: `${names.app}/${names.client}/index.js`,
-      watch: `${names.client}/src/**/*.ts`
+      watch: `${names.client}/src/**/*.ts`,
+      tsconfig: `${names.client}/tsconfig.json`
     },
     vendors: {
       manifest: `${names.client}/vendors.json`,
@@ -114,9 +115,6 @@ const paths = {
     client: {
       directory: `${names.app}/${names.client}`
     }
-  },
-  client: {
-    tsconfig: `${names.client}/tsconfig.json`
   },
   env: '.env'
 };
@@ -350,7 +348,7 @@ function buildJs(done) {
   jsBundle = browserify(browserifyOptions);
 
   // transpile TypeScript
-  jsBundle.plugin(tsify, { project: paths.client.tsconfig });
+  jsBundle.plugin(tsify, { project: config.client.ts.tsconfig });
 
   // replace environment variables
   jsBundle.transform(envify({
