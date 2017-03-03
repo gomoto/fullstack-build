@@ -57,6 +57,27 @@ const names = {
 
 const config = {
   client: {
+    html: {
+      entry: `${names.client}/src/index.html`,
+      bundle: `${names.app}/${names.client}/index.html`,
+      watch: `${names.client}/src/**/*.html`,
+      inject: {
+        templates: {
+          globs: [`${names.client}/src/*/**/*.html`]
+        },
+        css: {
+          globs: [`${names.app}/${names.client}/index-*.css`],
+          cwd: `${names.app}/${names.client}`
+        },
+        js: {
+          globs: [
+            `${names.app}/${names.client}/vendor-*.js`,
+            `${names.app}/${names.client}/index-*.js`
+          ],
+          cwd: `${names.app}/${names.client}`
+        }
+      }
+    },
     scss: {
       entry: `${names.client}/src/index.scss`,
       bundle: `${names.app}/${names.client}/index.css`,
@@ -91,15 +112,10 @@ const paths = {
     directory: `${names.app}`,
     gitSha: `${names.app}/git-sha.txt`,
     client: {
-      directory: `${names.app}/${names.client}`,
-      html: `${names.app}/${names.client}/index.html`
+      directory: `${names.app}/${names.client}`
     }
   },
   client: {
-    html: {
-      templates: `${names.client}/src/*/**/*.html`,
-      entry: `${names.client}/src/index.html`
-    },
     tsconfig: `${names.client}/tsconfig.json`
   },
   env: '.env'
@@ -123,28 +139,13 @@ const vendors = jsonfile.readFileSync(`./${config.client.vendors.manifest}`, { t
 function buildHtml(done) {
   done = done || noop;
   timeClient('html build');
-  fs.createReadStream(paths.client.html.entry)
-  .pipe(htmlInjector({
-    templates: {
-      globs: [paths.client.html.templates]
-    },
-    css: {
-      globs: [hashGlob(config.client.scss.bundle)],
-      cwd: paths.app.client.directory
-    },
-    js: {
-      globs: [
-        hashGlob(config.client.vendors.bundle),
-        hashGlob(config.client.ts.bundle)
-      ],
-      cwd: paths.app.client.directory
-    }
-  }))
+  fs.createReadStream(config.client.html.entry)
+  .pipe(htmlInjector(config.client.html.inject))
   .pipe(htmlMinifierStream({
     collapseWhitespace: true,
     processScripts: ['text/ng-template']
   }))
-  .pipe(source(paths.app.client.html))
+  .pipe(source(config.client.html.bundle))
   .pipe(buffer())
   .pipe(revReplace({
     manifest: gulp.src(config.resources.images.manifest)
@@ -163,7 +164,7 @@ function buildHtml(done) {
 function cleanHtml(done) {
   done = done || noop;
   timeClient('html clean');
-  return trash([paths.app.client.html])
+  return trash([config.client.html.bundle])
   .then(() => {
     timeEndClient('html clean');
     done();
@@ -187,10 +188,7 @@ function rebuildHtml(done) {
 function watchHtml(callback) {
   callback = callback || noop;
   logClient('watching html');
-  gulp.watch([
-    paths.client.html.templates,
-    paths.client.html.entry
-  ], (event) => {
+  gulp.watch(config.client.html.watch, (event) => {
     logClientWatchEvent(event);
     rebuildHtml(callback);
   });
