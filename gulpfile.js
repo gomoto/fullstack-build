@@ -18,6 +18,7 @@ const dotenv = require('dotenv');
 const envify = require('envify/custom');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
+const glob = require('glob');
 const gulp = require('gulp');
 const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
@@ -31,7 +32,6 @@ const sass = require('gulp-sass');
 const source = require('vinyl-source-stream');
 const sourcemaps = require('gulp-sourcemaps');
 const tcp = require('tcp-port-used');
-const trash = require('trash');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
@@ -39,15 +39,69 @@ const uglify = require('gulp-uglify');
 const noop = Function.prototype;
 
 /**
- * file.css -> file-*.css
- * file.js -> file-*.js
+ * file.css -> file-*.css?(.map)
+ * file.js -> file-*.js?(.map)
  */
 function hashGlob(filepath) {
   const dirname = path.dirname(filepath);
   const extname = path.extname(filepath);
   const basename = path.basename(filepath, extname);
-  return path.join(dirname, `${basename}-*${extname}`);
+  return path.join(dirname, `${basename}-*${extname}`) + '?(.map)';
 }
+
+/**
+ * Delete file. Then delete ancestor directories that are empty.
+ */
+function cleanPath(filepath, done) {
+  done = done || noop;
+  // If you need to go to parent of working directory to get to filepath,
+  // then filepath is not inside working directory.
+  if (path.relative(process.cwd(), filepath).slice(0,2) === '..') {
+    throw new Error('filepath must live inside working directory');
+  }
+  fs.unlink(filepath, () => {
+    // Remove empty directories until working directory is reached.
+    removeEmptyDirectory(path.dirname(filepath), process.cwd());
+    done();
+  });
+}
+
+/**
+ * Delete multiple files.
+ */
+function cleanPaths(filepaths, done) {
+  done = done || noop;
+  const tasks = filepaths.map((filepath) => {
+    return (then) => {
+      cleanPath(filepath, then);
+    }
+  });
+  async.parallel(tasks, done);
+}
+
+/**
+ * Remove empty directories until non-empty or root directory is reached.
+ */
+function removeEmptyDirectory(current, root) {
+  // Don't remove root directory.
+  if (path.relative(current, root) === '') {
+    return;
+  }
+  // Directory does not exist.
+  if (!fs.existsSync(current)) {
+    return;
+  }
+  const contents = fs.readdirSync(current);
+  // Directory has contents.
+  if (contents.length > 0) {
+    return;
+  }
+  // Directory is empty. Remove it.
+  fs.rmdirSync(current);
+  // Remove empty parent directory.
+  removeEmptyDirectory(path.dirname(current), root);
+}
+
 
 const names = {
   app: 'app',
@@ -110,12 +164,6 @@ const config = {
 };
 
 const paths = {
-  app: {
-    directory: `${names.app}`,
-    client: {
-      directory: `${names.app}/${names.client}`
-    }
-  },
   env: '.env'
 };
 
@@ -157,13 +205,11 @@ function buildHtml(done) {
 
 /**
  * Delete index.html
- * @return {promise}
  */
 function cleanHtml(done) {
   done = done || noop;
   timeClient('html clean');
-  return trash([config.client.html.bundle])
-  .then(() => {
+  cleanPath(config.client.html.bundle, () => {
     timeEndClient('html clean');
     done();
   });
@@ -235,19 +281,15 @@ function buildCss(done) {
 
 /**
  * Delete index.css and its sourcemap.
- * @return {promise}
  */
 function cleanCss(done) {
   done = done || noop;
   timeClient('css clean');
-  const hashedBundle = hashGlob(config.client.scss.bundle);
-  return trash([
-    hashedBundle,
-    `${hashedBundle}.map`
-  ])
-  .then(() => {
-    timeEndClient('css clean');
-    done();
+  glob(hashGlob(config.client.scss.bundle), (error, files) => {
+    cleanPaths(files, () => {
+      timeEndClient('css clean');
+      done();
+    });
   });
 }
 
@@ -389,19 +431,15 @@ function watchJs(callback) {
 
 /**
  * Delete index.js file and its sourcemap.
- * @return {promise}
  */
 function cleanJs(done) {
   done = done || noop;
   timeClient('js clean');
-  const hashedBundle = hashGlob(config.client.ts.bundle);
-  return trash([
-    hashedBundle,
-    `${hashedBundle}.map`
-  ])
-  .then(() => {
-    timeEndClient('js clean');
-    done();
+  glob(hashGlob(config.client.ts.bundle), (error, files) => {
+    cleanPaths(files, () => {
+      timeEndClient('js clean');
+      done();
+    });
   });
 }
 
@@ -460,19 +498,15 @@ function buildVendor(done) {
 
 /**
  * Delete vendor bundle and its sourcemap.
- * @return {promise}
  */
 function cleanVendor(done) {
   done = done || noop;
   timeClient('vendor clean');
-  const hashedBundle = hashGlob(config.client.vendors.bundle);
-  return trash([
-    hashedBundle,
-    `${hashedBundle}.map`
-  ])
-  .then(() => {
-    timeEndClient('vendor clean');
-    done();
+  glob(hashGlob(config.client.vendors.bundle), (error, files) => {
+    cleanPaths(files, () => {
+      timeEndClient('vendor clean');
+      done();
+    });
   });
 }
 
@@ -540,15 +574,15 @@ function buildImages(done) {
 /**
  * Delete image files.
  * @param  {Function} done
- * @return {promise}
  */
 function cleanImages(done) {
   done = done || noop;
   timeClient('images clean');
-  return trash([config.resources.images.to])
-  .then(() => {
-    timeEndClient('images clean');
-    done();
+  glob(path.join(config.resources.images.to, '**/*'), (error, files) => {
+    cleanPaths(files, () => {
+      timeEndClient('images clean');
+      done();
+    });
   });
 }
 
@@ -628,7 +662,14 @@ function watchClient(callback) {
  * @param {Function} done
  */
 function cleanClient(done) {
-  fsExtra.remove(paths.app.client.directory, done);
+  done = done || noop;
+  async.parallel([
+    cleanCss,
+    cleanJs,
+    cleanVendor,
+    cleanImages,
+    cleanHtml
+  ], done);
 }
 
 /**
@@ -711,7 +752,11 @@ function watchServer(callback, includeMaps) {
  * @param {Function} done
  */
 function cleanServer(done) {
-  fsExtra.remove(config.server.to, done);
+  glob(path.join(config.server.to, '**/*'), (error, files) => {
+    cleanPaths(files, () => {
+      done();
+    });
+  });
 }
 
 /**
@@ -748,6 +793,11 @@ function writeGitCommit(done) {
   });
 }
 
+function cleanGitCommit(done) {
+  done = done || noop;
+  cleanPath(config.gitCommit, done);
+}
+
 gulp.task('git-commit', (done) => {
   writeGitCommit(done);
 });
@@ -767,13 +817,22 @@ function build(done, includeMaps) {
   ], done);
 }
 
+function clean(done) {
+  done = done || noop;
+  async.parallel([
+    cleanClient,
+    cleanServer,
+    cleanGitCommit
+  ], done);
+}
+
 function watch(callback, includeMaps) {
   watchClient(callback);
   watchServer(callback, !!includeMaps);
 }
 
 gulp.task('clean', (done) => {
-  fsExtra.remove(paths.app.directory, done);
+  clean(done);
 });
 
 // If we use gulp subtasks, the time report for this task is not useful.

@@ -18,6 +18,9 @@ RUN chmod +x ./build
 COPY watch ./
 RUN chmod +x ./watch
 
+COPY clean ./
+RUN chmod +x ./clean
+
 VOLUME /project
 
 CMD ["./build"]
