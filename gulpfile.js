@@ -44,6 +44,16 @@ const names = {
   server: 'server'
 };
 
+const config = {
+  resources: {
+    images: {
+      from: `${names.client}/assets/images`,
+      to: `${names.app}/${names.client}/assets/images`,
+      manifest: `${names.app}/${names.client}/assets/images/manifest.json`
+    }
+  }
+};
+
 const paths = {
   app: {
     directory: `${names.app}`,
@@ -62,14 +72,7 @@ const paths = {
       vendor: {
         raw: `${names.app}/${names.client}/vendor.js`,
         hashed: `${names.app}/${names.client}/vendor-*.js`
-      },
-      assets: {
-        directory: `${names.app}/${names.client}/assets`,
-        images: {
-          directory: `${names.app}/${names.client}/assets/images`,
-          manifest: `${names.app}/${names.client}/assets/images/manifest.json`,
-        }
-      },
+      }
     },
     server: {
       directory: `${names.app}/${names.server}`
@@ -89,10 +92,6 @@ const paths = {
       entry: `${names.client}/src/index.ts`
     },
     vendor: `${names.client}/vendors.json`,
-    assets: {
-      directory: `${names.client}/assets`,
-      images: `${names.client}/assets/images/**/*`
-    },
     tsconfig: `${names.client}/tsconfig.json`
   },
   server: {
@@ -145,7 +144,7 @@ function buildHtml(done) {
   .pipe(source(paths.app.client.html))
   .pipe(buffer())
   .pipe(revReplace({
-    manifest: gulp.src(paths.app.client.assets.images.manifest)
+    manifest: gulp.src(config.resources.images.manifest)
   }))
   .pipe(gulp.dest('.'))
   .on('finish', () => {
@@ -524,11 +523,11 @@ gulp.task('vendor:watch', ['vendor'], function() {
 function buildImages(done) {
   done = done || noop;
   timeClient('images build');
-  return gulp.src(paths.client.assets.images)
+  return gulp.src(path.join(config.resources.images.from, '**/*'))
   .pipe(imagemin())
   .pipe(rev())
-  .pipe(gulp.dest(paths.app.client.assets.images.directory))
-  .pipe(rev.manifest(paths.app.client.assets.images.manifest))
+  .pipe(gulp.dest(config.resources.images.to))
+  .pipe(rev.manifest(config.resources.images.manifest))
   .pipe(gulp.dest('.'))
   .on('finish', () => {
     timeEndClient('images build');
@@ -544,7 +543,7 @@ function buildImages(done) {
 function cleanImages(done) {
   done = done || noop;
   timeClient('images clean');
-  return trash([paths.app.client.assets.images.directory])
+  return trash([config.resources.images.to])
   .then(() => {
     timeEndClient('images clean');
     done();
@@ -559,7 +558,7 @@ function cleanImages(done) {
 function watchImages(callback) {
   callback = callback || noop;
   logClient('watching images');
-  gulp.watch(paths.client.assets.images, (event) => {
+  gulp.watch(path.join(config.resources.images.from, '**/*'), (event) => {
     logClientWatchEvent(event);
     cleanImages(() => {
       buildImages(() => {
