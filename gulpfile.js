@@ -51,9 +51,9 @@ function hashGlob(filepath) {
 }
 
 /**
- * Delete file. Then delete ancestor directories that are empty.
+ * Remove file. Then remove ancestor directories that are empty.
  */
-function cleanPath(filepath, done) {
+function removeFile(filepath, done) {
   done = done || noop;
   // If you need to go to parent of working directory to get to filepath,
   // then filepath is not inside working directory.
@@ -68,7 +68,7 @@ function cleanPath(filepath, done) {
 }
 
 /**
- * Remove directory. Then delete ancestor directories that are empty.
+ * Remove directory. Then remove ancestor directories that are empty.
  */
 function removeDirectory(directory, done) {
   done = done || noop;
@@ -85,13 +85,13 @@ function removeDirectory(directory, done) {
 }
 
 /**
- * Delete multiple files.
+ * Remove multiple files.
  */
-function cleanPaths(filepaths, done) {
+function removeFiles(filepaths, done) {
   done = done || noop;
   const tasks = filepaths.map((filepath) => {
     return (then) => {
-      cleanPath(filepath, then);
+      removeFile(filepath, then);
     }
   });
   async.parallel(tasks, done);
@@ -227,7 +227,7 @@ function buildHtml(done) {
 function cleanHtml(done) {
   done = done || noop;
   timeClient('html clean');
-  cleanPath(config.client.html.bundle, () => {
+  removeFile(config.client.html.bundle, () => {
     timeEndClient('html clean');
     done();
   });
@@ -304,7 +304,7 @@ function cleanCss(done) {
   done = done || noop;
   timeClient('css clean');
   glob(hashGlob(config.client.scss.bundle), (error, files) => {
-    cleanPaths(files, () => {
+    removeFiles(files, () => {
       timeEndClient('css clean');
       done();
     });
@@ -454,7 +454,7 @@ function cleanJs(done) {
   done = done || noop;
   timeClient('js clean');
   glob(hashGlob(config.client.ts.bundle), (error, files) => {
-    cleanPaths(files, () => {
+    removeFiles(files, () => {
       timeEndClient('js clean');
       done();
     });
@@ -521,7 +521,7 @@ function cleanVendor(done) {
   done = done || noop;
   timeClient('vendor clean');
   glob(hashGlob(config.client.vendors.bundle), (error, files) => {
-    cleanPaths(files, () => {
+    removeFiles(files, () => {
       timeEndClient('vendor clean');
       done();
     });
@@ -807,7 +807,7 @@ function writeGitCommit(done) {
 
 function cleanGitCommit(done) {
   done = done || noop;
-  cleanPath(config.gitCommit, done);
+  removeFile(config.gitCommit, done);
 }
 
 gulp.task('git-commit', (done) => {
