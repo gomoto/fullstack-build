@@ -105,13 +105,13 @@ const config = {
       to: `${names.app}/${names.client}/assets/images`,
       manifest: `${names.app}/${names.client}/assets/images/manifest.json`
     }
-  }
+  },
+  gitCommit: `${names.app}/git-sha.txt`
 };
 
 const paths = {
   app: {
     directory: `${names.app}`,
-    gitSha: `${names.app}/git-sha.txt`,
     client: {
       directory: `${names.app}/${names.client}`
     }
@@ -736,20 +736,20 @@ gulp.task('build:server', (done) => {
 
 
 /**
- * Git SHA
+ * Git commit
  */
 
-function writeGitSha(done) {
+function writeGitCommit(done) {
   done = done || noop;
-  const sha = child_process.execSync('git rev-parse HEAD');
-  fsExtra.outputFile(paths.app.gitSha, sha, (err) => {
+  const commit = child_process.execSync('git rev-parse HEAD');
+  fsExtra.outputFile(config.gitCommit, commit, (err) => {
     if (err) console.log(err);
     done();
   });
 }
 
-gulp.task('git-sha', (done) => {
-  writeGitSha(done);
+gulp.task('git-commit', (done) => {
+  writeGitCommit(done);
 });
 
 
@@ -763,7 +763,7 @@ function build(done, includeMaps) {
   async.parallel([
     buildClient,
     (then) => buildServer(then, !!includeMaps),
-    writeGitSha
+    writeGitCommit
   ], done);
 }
 
