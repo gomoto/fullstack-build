@@ -28,6 +28,7 @@ const mergeStream = require('merge-stream');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
+const rimraf = require('rimraf');
 const sass = require('gulp-sass');
 const source = require('vinyl-source-stream');
 const sourcemaps = require('gulp-sourcemaps');
@@ -62,6 +63,23 @@ function cleanPath(filepath, done) {
   fs.unlink(filepath, () => {
     // Remove empty directories until working directory is reached.
     removeEmptyDirectory(path.dirname(filepath), process.cwd());
+    done();
+  });
+}
+
+/**
+ * Remove directory. Then delete ancestor directories that are empty.
+ */
+function removeDirectory(directory, done) {
+  done = done || noop;
+  // If you need to go to parent of working directory to get to directory,
+  // then directory is not inside working directory.
+  if (path.relative(process.cwd(), directory).slice(0,2) === '..') {
+    throw new Error('directory must live inside working directory');
+  }
+  rimraf(directory, () => {
+    // Remove empty directories until working directory is reached.
+    removeEmptyDirectory(path.dirname(directory), process.cwd());
     done();
   });
 }
@@ -578,11 +596,9 @@ function buildImages(done) {
 function cleanImages(done) {
   done = done || noop;
   timeClient('images clean');
-  glob(path.join(config.resources.images.to, '**/*'), (error, files) => {
-    cleanPaths(files, () => {
-      timeEndClient('images clean');
-      done();
-    });
+  removeDirectory(config.resources.images.to, () => {
+    timeEndClient('images clean');
+    done();
   });
 }
 
@@ -752,11 +768,7 @@ function watchServer(callback, includeMaps) {
  * @param {Function} done
  */
 function cleanServer(done) {
-  glob(path.join(config.server.to, '**/*'), (error, files) => {
-    cleanPaths(files, () => {
-      done();
-    });
-  });
+  removeDirectory(config.server.to, done);
 }
 
 /**
