@@ -45,6 +45,11 @@ const names = {
 };
 
 const config = {
+  server: {
+    from: `${names.server}/src`,
+    to: `${names.app}/${names.server}`,
+    tsconfig: `${names.server}/tsconfig.json`
+  },
   resources: {
     images: {
       from: `${names.client}/assets/images`,
@@ -73,9 +78,6 @@ const paths = {
         raw: `${names.app}/${names.client}/vendor.js`,
         hashed: `${names.app}/${names.client}/vendor-*.js`
       }
-    },
-    server: {
-      directory: `${names.app}/${names.server}`
     }
   },
   client: {
@@ -93,11 +95,6 @@ const paths = {
     },
     vendor: `${names.client}/vendors.json`,
     tsconfig: `${names.client}/tsconfig.json`
-  },
-  server: {
-    typescript: `${names.server}/src/**/!(*.spec).ts`,
-    html: `${names.server}/src/**/*.html`,
-    tsconfig: `${names.server}/tsconfig.json`
   },
   env: '.env'
 };
@@ -655,7 +652,7 @@ gulp.task('build:client', function(done) {
 
 
 
-const serverTypescript = typescript.createProject(paths.server.tsconfig);
+const serverTypescript = typescript.createProject(config.server.tsconfig);
 
 /**
  * Build server files.
@@ -668,7 +665,7 @@ function buildServer(done, includeMaps) {
   logServer('building...');
   timeServer('build');
 
-  var stream = gulp.src(paths.server.typescript);
+  var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
 
   if (includeMaps) {
     stream = stream.pipe(sourcemaps.init());
@@ -681,8 +678,8 @@ function buildServer(done, includeMaps) {
   }
 
   return stream
-  .pipe(addSrc(paths.server.html))
-  .pipe(gulp.dest(paths.app.server.directory))
+  .pipe(addSrc(path.join(config.server.from, '**/*.html')))
+  .pipe(gulp.dest(config.server.to))
   .on('finish', () => {
     timeEndServer('build');
     done();
@@ -698,7 +695,7 @@ function buildServer(done, includeMaps) {
 function watchServer(callback, includeMaps) {
   callback = callback || noop;
   logServer('watching all files');
-  gulp.watch(paths.server.typescript, (event) => {
+  gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
     rebuildServer(callback, !!includeMaps);
   });
@@ -709,7 +706,7 @@ function watchServer(callback, includeMaps) {
  * @param {Function} done
  */
 function cleanServer(done) {
-  fsExtra.remove(paths.app.server.directory, done);
+  fsExtra.remove(config.server.to, done);
 }
 
 /**
