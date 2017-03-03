@@ -38,6 +38,17 @@ const uglify = require('gulp-uglify');
 
 const noop = Function.prototype;
 
+/**
+ * file.css -> file-*.css
+ * file.js -> file-*.js
+ */
+function hashGlob(filepath) {
+  const dirname = path.dirname(filepath);
+  const extname = path.extname(filepath);
+  const basename = path.basename(filepath, extname);
+  return path.join(dirname, `${basename}-*${extname}`);
+}
+
 const names = {
   app: 'app',
   client: 'client',
@@ -50,6 +61,11 @@ const config = {
       entry: `${names.client}/src/index.scss`,
       bundle: `${names.app}/${names.client}/index.css`,
       watch: `${names.client}/src/**/*.scss`
+    },
+    ts: {
+      entry: `${names.client}/src/index.ts`,
+      bundle: `${names.app}/${names.client}/index.js`,
+      watch: `${names.client}/src/**/*.ts`
     }
   },
   server: {
@@ -73,10 +89,6 @@ const paths = {
     client: {
       directory: `${names.app}/${names.client}`,
       html: `${names.app}/${names.client}/index.html`,
-      js: {
-        raw: `${names.app}/${names.client}/index.js`,
-        hashed: `${names.app}/${names.client}/index-*.js`
-      },
       vendor: {
         raw: `${names.app}/${names.client}/vendor.js`,
         hashed: `${names.app}/${names.client}/vendor-*.js`
@@ -87,10 +99,6 @@ const paths = {
     html: {
       templates: `${names.client}/src/*/**/*.html`,
       entry: `${names.client}/src/index.html`
-    },
-    js: {
-      source: `${names.client}/src/**/*.ts`,
-      entry: `${names.client}/src/index.ts`
     },
     vendor: `${names.client}/vendors.json`,
     tsconfig: `${names.client}/tsconfig.json`
@@ -122,13 +130,13 @@ function buildHtml(done) {
       globs: [paths.client.html.templates]
     },
     css: {
-      globs: [hashGlobCss(config.client.scss.bundle)],
+      globs: [hashGlob(config.client.scss.bundle)],
       cwd: paths.app.client.directory
     },
     js: {
       globs: [
         paths.app.client.vendor.hashed,
-        paths.app.client.js.hashed
+        hashGlob(config.client.ts.bundle)
       ],
       cwd: paths.app.client.directory
     }
@@ -237,7 +245,7 @@ function buildCss(done) {
 function cleanCss(done) {
   done = done || noop;
   timeClient('css clean');
-  const hashedBundle = hashGlobCss(config.client.scss.bundle);
+  const hashedBundle = hashGlob(config.client.scss.bundle);
   return trash([
     hashedBundle,
     `${hashedBundle}.map`
@@ -282,15 +290,6 @@ gulp.task('css:watch', ['css'], function() {
   watchCss();
 });
 
-/**
- * file.css -> file-*.css
- */
-function hashGlobCss(filepath) {
-  const dirname = path.dirname(filepath);
-  const basename = path.basename(filepath, '.css');
-  return path.join(dirname, `${basename}-*.css`);
-}
-
 
 
 /**
@@ -324,7 +323,7 @@ function bundleJs(done) {
   }
   return jsBundle.bundle()
   .on('error', console.error)
-  .pipe(source(paths.app.client.js.raw))
+  .pipe(source(config.client.ts.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
@@ -347,7 +346,7 @@ function buildJs(done) {
   const browserifyOptions = {
     cache: {},
     packageCache: {},
-    entries: [paths.client.js.entry],
+    entries: [config.client.ts.entry],
     debug: true
   };
 
@@ -381,7 +380,7 @@ function buildJs(done) {
 function watchJs(callback) {
   callback = callback || noop;
   logClient('watching js');
-  gulp.watch(paths.client.js.source, (event) => {
+  gulp.watch(config.client.ts.watch, (event) => {
     logClientWatchEvent(event);
     cleanJs(() => {
       timeClient('js build (incremental)');
@@ -400,9 +399,10 @@ function watchJs(callback) {
 function cleanJs(done) {
   done = done || noop;
   timeClient('js clean');
+  const hashedBundle = hashGlob(config.client.ts.bundle);
   return trash([
-    paths.app.client.js.hashed,
-    `${paths.app.client.js.hashed}.map`
+    hashedBundle,
+    `${hashedBundle}.map`
   ])
   .then(() => {
     timeEndClient('js clean');
