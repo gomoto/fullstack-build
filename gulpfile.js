@@ -66,6 +66,10 @@ const config = {
       entry: `${names.client}/src/index.ts`,
       bundle: `${names.app}/${names.client}/index.js`,
       watch: `${names.client}/src/**/*.ts`
+    },
+    vendors: {
+      manifest: `${names.client}/vendors.json`,
+      bundle: `${names.app}/${names.client}/vendor.js`
     }
   },
   server: {
@@ -88,11 +92,7 @@ const paths = {
     gitSha: `${names.app}/git-sha.txt`,
     client: {
       directory: `${names.app}/${names.client}`,
-      html: `${names.app}/${names.client}/index.html`,
-      vendor: {
-        raw: `${names.app}/${names.client}/vendor.js`,
-        hashed: `${names.app}/${names.client}/vendor-*.js`
-      }
+      html: `${names.app}/${names.client}/index.html`
     }
   },
   client: {
@@ -100,14 +100,13 @@ const paths = {
       templates: `${names.client}/src/*/**/*.html`,
       entry: `${names.client}/src/index.html`
     },
-    vendor: `${names.client}/vendors.json`,
     tsconfig: `${names.client}/tsconfig.json`
   },
   env: '.env'
 };
 
 // Read vendors manifest if there is one.
-const vendors = jsonfile.readFileSync(`./${paths.client.vendor}`, { throws: false });
+const vendors = jsonfile.readFileSync(`./${config.client.vendors.manifest}`, { throws: false });
 
 
 
@@ -135,7 +134,7 @@ function buildHtml(done) {
     },
     js: {
       globs: [
-        paths.app.client.vendor.hashed,
+        hashGlob(config.client.vendors.bundle),
         hashGlob(config.client.ts.bundle)
       ],
       cwd: paths.app.client.directory
@@ -450,7 +449,7 @@ function buildVendor(done) {
 
   return b.bundle()
   .on('error', console.error)
-  .pipe(source(paths.app.client.vendor.raw))
+  .pipe(source(config.client.vendors.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
@@ -470,9 +469,10 @@ function buildVendor(done) {
 function cleanVendor(done) {
   done = done || noop;
   timeClient('vendor clean');
+  const hashedBundle = hashGlob(config.client.vendors.bundle);
   return trash([
-    paths.app.client.vendor.hashed,
-    `${paths.app.client.vendor.hashed}.map`
+    hashedBundle,
+    `${hashedBundle}.map`
   ])
   .then(() => {
     timeEndClient('vendor clean');
@@ -488,7 +488,7 @@ function cleanVendor(done) {
 function watchVendor(callback) {
   callback = callback || noop;
   logClient('watching vendor');
-  gulp.watch(paths.client.vendor, (event) => {
+  gulp.watch(config.client.vendors.manifest, (event) => {
     logClientWatchEvent(event);
     cleanVendor(() => {
       buildVendor(() => {
