@@ -45,6 +45,13 @@ const names = {
 };
 
 const config = {
+  client: {
+    scss: {
+      entry: `${names.client}/src/index.scss`,
+      bundle: `${names.app}/${names.client}/index.css`,
+      watch: `${names.client}/src/**/*.scss`
+    }
+  },
   server: {
     from: `${names.server}/src`,
     to: `${names.app}/${names.server}`,
@@ -66,10 +73,6 @@ const paths = {
     client: {
       directory: `${names.app}/${names.client}`,
       html: `${names.app}/${names.client}/index.html`,
-      css: {
-        raw: `${names.app}/${names.client}/index.css`,
-        hashed: `${names.app}/${names.client}/index-*.css`
-      },
       js: {
         raw: `${names.app}/${names.client}/index.js`,
         hashed: `${names.app}/${names.client}/index-*.js`
@@ -84,10 +87,6 @@ const paths = {
     html: {
       templates: `${names.client}/src/*/**/*.html`,
       entry: `${names.client}/src/index.html`
-    },
-    css: {
-      source: `${names.client}/src/**/*.scss`,
-      entry: `${names.client}/src/index.scss`
     },
     js: {
       source: `${names.client}/src/**/*.ts`,
@@ -123,7 +122,7 @@ function buildHtml(done) {
       globs: [paths.client.html.templates]
     },
     css: {
-      globs: [paths.app.client.css.hashed],
+      globs: [hashGlobCss(config.client.scss.bundle)],
       cwd: paths.app.client.directory
     },
     js: {
@@ -217,11 +216,11 @@ gulp.task('html:watch', ['html'], function() {
 function buildCss(done) {
   done = done || noop;
   timeClient('css build');
-  return gulp.src(paths.client.css.entry)
+  return gulp.src(config.client.scss.entry)
   .pipe(sourcemaps.init())
   .pipe(sass({ outputStyle: 'compressed' }).on('error', sass.logError))
   .pipe(autoprefixer({ browsers: ['last 2 versions'] }))
-  .pipe(rename(paths.app.client.css.raw))
+  .pipe(rename(config.client.scss.bundle))
   .pipe(rev())
   .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('.'))
@@ -238,9 +237,10 @@ function buildCss(done) {
 function cleanCss(done) {
   done = done || noop;
   timeClient('css clean');
+  const hashedBundle = hashGlobCss(config.client.scss.bundle);
   return trash([
-    paths.app.client.css.hashed,
-    `${paths.app.client.css.hashed}.map`
+    hashedBundle,
+    `${hashedBundle}.map`
   ])
   .then(() => {
     timeEndClient('css clean');
@@ -256,7 +256,7 @@ function cleanCss(done) {
 function watchCss(callback) {
   callback = callback || noop;
   logClient('watching css');
-  gulp.watch(paths.client.css.source, (event) => {
+  gulp.watch(config.client.scss.watch, (event) => {
     logClientWatchEvent(event);
     cleanCss(() => {
       buildCss(() => {
@@ -281,6 +281,15 @@ gulp.task('css:clean', function(done) {
 gulp.task('css:watch', ['css'], function() {
   watchCss();
 });
+
+/**
+ * file.css -> file-*.css
+ */
+function hashGlobCss(filepath) {
+  const dirname = path.dirname(filepath);
+  const basename = path.basename(filepath, '.css');
+  return path.join(dirname, `${basename}-*.css`);
+}
 
 
 
