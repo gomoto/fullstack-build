@@ -15,7 +15,6 @@ const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
 const dotenv = require('dotenv');
-const envify = require('envify/custom');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const gulp = require('gulp');
@@ -23,88 +22,84 @@ const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
 const jsonfile = require('jsonfile');
-const mergeStream = require('merge-stream');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
+const rimraf = require('rimraf');
 const sass = require('gulp-sass');
 const source = require('vinyl-source-stream');
 const sourcemaps = require('gulp-sourcemaps');
 const tcp = require('tcp-port-used');
-const trash = require('trash');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 
+const config = require('./config')();
 const noop = Function.prototype;
 
-const names = {
-  app: 'app',
-  client: 'client',
-  server: 'server'
-};
+/**
+ * file.css -> file-*.css?(.map)
+ * file.js -> file-*.js?(.map)
+ */
+function hashGlob(filepath) {
+  const dirname = path.dirname(filepath);
+  const extname = path.extname(filepath);
+  const basename = path.basename(filepath, extname);
+  return path.join(dirname, `${basename}-*${extname}`) + '?(.map)';
+}
+
+/**
+ * Remove file or directory. Then remove ancestor directories that are empty.
+ * Entity can be a glob.
+ */
+function removePath(entity, done) {
+  done = done || noop;
+  // If you need to go to parent of working directory to get to entity, then
+  // entity is not inside working directory. This check also works on globs.
+  if (path.relative(process.cwd(), entity).slice(0,2) === '..') {
+    throw new Error('entity must live inside working directory');
+  }
+  rimraf(entity, () => {
+    // Remove empty directories until working directory is reached.
+    removeEmptyDirectory(path.dirname(entity), process.cwd());
+    done();
+  });
+}
+
+/**
+ * Remove empty directories until non-empty or root directory is reached.
+ */
+function removeEmptyDirectory(current, root) {
+  // Don't remove root directory.
+  if (path.relative(current, root) === '') {
+    return;
+  }
+  // Directory does not exist.
+  if (!fs.existsSync(current)) {
+    return;
+  }
+  const contents = fs.readdirSync(current);
+  // Directory has contents.
+  if (contents.length > 0) {
+    return;
+  }
+  // Directory is empty. Remove it.
+  fs.rmdirSync(current);
+  // Remove empty parent directory.
+  removeEmptyDirectory(path.dirname(current), root);
+}
 
 const paths = {
-  app: {
-    directory: `${names.app}`,
-    gitSha: `${names.app}/git-sha.txt`,
-    client: {
-      directory: `${names.app}/${names.client}`,
-      html: `${names.app}/${names.client}/index.html`,
-      css: {
-        raw: `${names.app}/${names.client}/index.css`,
-        hashed: `${names.app}/${names.client}/index-*.css`
-      },
-      js: {
-        raw: `${names.app}/${names.client}/index.js`,
-        hashed: `${names.app}/${names.client}/index-*.js`
-      },
-      vendor: {
-        raw: `${names.app}/${names.client}/vendor.js`,
-        hashed: `${names.app}/${names.client}/vendor-*.js`
-      },
-      assets: {
-        directory: `${names.app}/${names.client}/assets`,
-        images: {
-          directory: `${names.app}/${names.client}/assets/images`,
-          manifest: `${names.app}/${names.client}/assets/images/manifest.json`,
-        }
-      },
-    },
-    server: {
-      directory: `${names.app}/${names.server}`
-    }
-  },
-  client: {
-    html: {
-      templates: `${names.client}/src/*/**/*.html`,
-      entry: `${names.client}/src/index.html`
-    },
-    css: {
-      source: `${names.client}/src/**/*.scss`,
-      entry: `${names.client}/src/index.scss`
-    },
-    js: {
-      source: `${names.client}/src/**/*.ts`,
-      entry: `${names.client}/src/index.ts`
-    },
-    vendor: `${names.client}/vendors.json`,
-    assets: {
-      directory: `${names.client}/assets`,
-      images: `${names.client}/assets/images/**/*`
-    },
-    tsconfig: `${names.client}/tsconfig.json`
-  },
-  server: {
-    typescript: `${names.server}/src/**/!(*.spec).ts`,
-    html: `${names.server}/src/**/*.html`,
-    tsconfig: `${names.server}/tsconfig.json`
-  },
   env: '.env'
 };
 
 // Read vendors manifest if there is one.
-const vendors = jsonfile.readFileSync(`./${paths.client.vendor}`, { throws: false });
+let vendors;
+if (config.client.vendors.manifest) {
+  vendors = jsonfile.readFileSync(`./${config.client.vendors.manifest}`, { throws: false });
+} else {
+  vendors = [];
+}
 
 
 
@@ -120,32 +115,28 @@ const vendors = jsonfile.readFileSync(`./${paths.client.vendor}`, { throws: fals
  */
 function buildHtml(done) {
   done = done || noop;
+
+  if (!(
+    config.client.html.entry &&
+    config.client.html.bundle &&
+    config.client.html.inject &&
+    config.resources.images.manifest
+  )) {
+    logSkip('html');
+    return done();
+  }
+
   timeClient('html build');
-  fs.createReadStream(paths.client.html.entry)
-  .pipe(htmlInjector({
-    templates: {
-      globs: [paths.client.html.templates]
-    },
-    css: {
-      globs: [paths.app.client.css.hashed],
-      cwd: paths.app.client.directory
-    },
-    js: {
-      globs: [
-        paths.app.client.vendor.hashed,
-        paths.app.client.js.hashed
-      ],
-      cwd: paths.app.client.directory
-    }
-  }))
+  fs.createReadStream(config.client.html.entry)
+  .pipe(htmlInjector(config.client.html.inject))
   .pipe(htmlMinifierStream({
     collapseWhitespace: true,
     processScripts: ['text/ng-template']
   }))
-  .pipe(source(paths.app.client.html))
+  .pipe(source(config.client.html.bundle))
   .pipe(buffer())
   .pipe(revReplace({
-    manifest: gulp.src(paths.app.client.assets.images.manifest)
+    manifest: gulp.src(config.resources.images.manifest)
   }))
   .pipe(gulp.dest('.'))
   .on('finish', () => {
@@ -156,13 +147,15 @@ function buildHtml(done) {
 
 /**
  * Delete index.html
- * @return {promise}
  */
 function cleanHtml(done) {
   done = done || noop;
+  if (!config.client.html.bundle) {
+    logSkip('html-clean');
+    return done();
+  }
   timeClient('html clean');
-  return trash([paths.app.client.html])
-  .then(() => {
+  removePath(config.client.html.bundle, () => {
     timeEndClient('html clean');
     done();
   });
@@ -184,27 +177,15 @@ function rebuildHtml(done) {
  */
 function watchHtml(callback) {
   callback = callback || noop;
+  if (!config.client.html.watch) {
+    return;
+  }
   logClient('watching html');
-  gulp.watch([
-    paths.client.html.templates,
-    paths.client.html.entry
-  ], (event) => {
+  gulp.watch(config.client.html.watch, (event) => {
     logClientWatchEvent(event);
     rebuildHtml(callback);
   });
 }
-
-gulp.task('html', function(done) {
-  rebuildHtml(done);
-});
-
-gulp.task('html:clean', function(done) {
-  cleanHtml(done);
-});
-
-gulp.task('html:watch', ['html'], function() {
-  watchHtml();
-});
 
 
 
@@ -220,12 +201,19 @@ gulp.task('html:watch', ['html'], function() {
  */
 function buildCss(done) {
   done = done || noop;
+  if (!(
+    config.client.scss.entry &&
+    config.client.scss.bundle
+  )) {
+    logSkip('scss');
+    return done();
+  }
   timeClient('css build');
-  return gulp.src(paths.client.css.entry)
+  return gulp.src(config.client.scss.entry)
   .pipe(sourcemaps.init())
   .pipe(sass({ outputStyle: 'compressed' }).on('error', sass.logError))
   .pipe(autoprefixer({ browsers: ['last 2 versions'] }))
-  .pipe(rename(paths.app.client.css.raw))
+  .pipe(rename(config.client.scss.bundle))
   .pipe(rev())
   .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('.'))
@@ -237,16 +225,15 @@ function buildCss(done) {
 
 /**
  * Delete index.css and its sourcemap.
- * @return {promise}
  */
 function cleanCss(done) {
   done = done || noop;
+  if (!config.client.scss.bundle) {
+    logSkip('scss-clean');
+    return done();
+  }
   timeClient('css clean');
-  return trash([
-    paths.app.client.css.hashed,
-    `${paths.app.client.css.hashed}.map`
-  ])
-  .then(() => {
+  removePath(hashGlob(config.client.scss.bundle), () => {
     timeEndClient('css clean');
     done();
   });
@@ -259,8 +246,11 @@ function cleanCss(done) {
  */
 function watchCss(callback) {
   callback = callback || noop;
+  if (!config.client.scss.watch) {
+    return;
+  }
   logClient('watching css');
-  gulp.watch(paths.client.css.source, (event) => {
+  gulp.watch(config.client.scss.watch, (event) => {
     logClientWatchEvent(event);
     cleanCss(() => {
       buildCss(() => {
@@ -269,22 +259,6 @@ function watchCss(callback) {
     });
   });
 }
-
-gulp.task('css', function(done) {
-  cleanCss(() => {
-    buildCss(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('css:clean', function(done) {
-  cleanCss(done);
-});
-
-gulp.task('css:watch', ['css'], function() {
-  watchCss();
-});
 
 
 
@@ -313,13 +287,16 @@ var jsBundle;
  */
 function bundleJs(done) {
   done = done || noop;
+  if (!config.client.ts.bundle) {
+    return done();
+  }
   if (!jsBundle) {
     console.error('buildJs() must be called at least once before this point');
     process.exit();
   }
   return jsBundle.bundle()
   .on('error', console.error)
-  .pipe(source(paths.app.client.js.raw))
+  .pipe(source(config.client.ts.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
@@ -338,24 +315,26 @@ function bundleJs(done) {
  */
 function buildJs(done) {
   done = done || noop;
+  if (!(
+    config.client.ts.entry &&
+    config.client.ts.tsconfig &&
+    config.client.vendors.manifest //vendors
+  )) {
+    logSkip('ts');
+    return done();
+  }
   timeClient('js build');
   const browserifyOptions = {
     cache: {},
     packageCache: {},
-    entries: [paths.client.js.entry],
+    entries: [config.client.ts.entry],
     debug: true
   };
 
   jsBundle = browserify(browserifyOptions);
 
   // transpile TypeScript
-  jsBundle.plugin(tsify, { project: paths.client.tsconfig });
-
-  // replace environment variables
-  jsBundle.transform(envify({
-    _: 'purge',
-    NODE_ENV: process.env.NODE_ENV || 'development'
-  }));
+  jsBundle.plugin(tsify, { project: config.client.ts.tsconfig });
 
   vendors.forEach((vendor) => {
     jsBundle.external(vendor);
@@ -375,8 +354,11 @@ function buildJs(done) {
  */
 function watchJs(callback) {
   callback = callback || noop;
+  if (!config.client.ts.watch) {
+    return;
+  }
   logClient('watching js');
-  gulp.watch(paths.client.js.source, (event) => {
+  gulp.watch(config.client.ts.watch, (event) => {
     logClientWatchEvent(event);
     cleanJs(() => {
       timeClient('js build (incremental)');
@@ -390,36 +372,19 @@ function watchJs(callback) {
 
 /**
  * Delete index.js file and its sourcemap.
- * @return {promise}
  */
 function cleanJs(done) {
   done = done || noop;
+  if (!config.client.ts.bundle) {
+    logSkip('ts-clean');
+    return done();
+  }
   timeClient('js clean');
-  return trash([
-    paths.app.client.js.hashed,
-    `${paths.app.client.js.hashed}.map`
-  ])
-  .then(() => {
+  removePath(hashGlob(config.client.ts.bundle), () => {
     timeEndClient('js clean');
     done();
   });
 }
-
-gulp.task('js', function(done) {
-  cleanJs(() => {
-    buildJs(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('js:clean', function(done) {
-  cleanJs(done);
-});
-
-gulp.task('js:watch', ['js'], function() {
-  watchJs();
-});
 
 
 
@@ -435,6 +400,13 @@ gulp.task('js:watch', ['js'], function() {
  */
 function buildVendor(done) {
   done = done || noop;
+  if (!(
+    config.client.vendors.bundle &&
+    config.client.vendors.manifest //vendors
+  )) {
+    logSkip('vendor');
+    return done();
+  }
   timeClient('vendor build');
 
   const b = browserify({ debug: true });
@@ -445,7 +417,7 @@ function buildVendor(done) {
 
   return b.bundle()
   .on('error', console.error)
-  .pipe(source(paths.app.client.vendor.raw))
+  .pipe(source(config.client.vendors.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
@@ -460,16 +432,15 @@ function buildVendor(done) {
 
 /**
  * Delete vendor bundle and its sourcemap.
- * @return {promise}
  */
 function cleanVendor(done) {
   done = done || noop;
+  if (!config.client.vendors.bundle) {
+    logSkip('vendor-clean');
+    return done();
+  }
   timeClient('vendor clean');
-  return trash([
-    paths.app.client.vendor.hashed,
-    `${paths.app.client.vendor.hashed}.map`
-  ])
-  .then(() => {
+  removePath(hashGlob(config.client.vendors.bundle), () => {
     timeEndClient('vendor clean');
     done();
   });
@@ -482,8 +453,11 @@ function cleanVendor(done) {
  */
 function watchVendor(callback) {
   callback = callback || noop;
+  if (!config.client.vendors.manifest) {
+    return;
+  }
   logClient('watching vendor');
-  gulp.watch(paths.client.vendor, (event) => {
+  gulp.watch(config.client.vendors.manifest, (event) => {
     logClientWatchEvent(event);
     cleanVendor(() => {
       buildVendor(() => {
@@ -492,22 +466,6 @@ function watchVendor(callback) {
     });
   });
 }
-
-gulp.task('vendor', function(done) {
-  cleanVendor(() => {
-    buildVendor(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('vendor:clean', function(done) {
-  cleanVendor(done);
-});
-
-gulp.task('vendor:watch', ['vendor'], function() {
-  watchVendor();
-});
 
 
 
@@ -523,12 +481,20 @@ gulp.task('vendor:watch', ['vendor'], function() {
  */
 function buildImages(done) {
   done = done || noop;
+  if (!(
+    config.resources.images.from &&
+    config.resources.images.to &&
+    config.resources.images.manifest
+  )) {
+    logSkip('images');
+    return done();
+  }
   timeClient('images build');
-  return gulp.src(paths.client.assets.images)
+  return gulp.src(path.join(config.resources.images.from, '**/*'))
   .pipe(imagemin())
   .pipe(rev())
-  .pipe(gulp.dest(paths.app.client.assets.images.directory))
-  .pipe(rev.manifest(paths.app.client.assets.images.manifest))
+  .pipe(gulp.dest(config.resources.images.to))
+  .pipe(rev.manifest(config.resources.images.manifest))
   .pipe(gulp.dest('.'))
   .on('finish', () => {
     timeEndClient('images build');
@@ -539,13 +505,15 @@ function buildImages(done) {
 /**
  * Delete image files.
  * @param  {Function} done
- * @return {promise}
  */
 function cleanImages(done) {
   done = done || noop;
+  if (!config.resources.images.to) {
+    logSkip('images-clean');
+    return done();
+  }
   timeClient('images clean');
-  return trash([paths.app.client.assets.images.directory])
-  .then(() => {
+  removePath(config.resources.images.to, () => {
     timeEndClient('images clean');
     done();
   });
@@ -558,8 +526,11 @@ function cleanImages(done) {
  */
 function watchImages(callback) {
   callback = callback || noop;
+  if (!config.resources.images.from) {
+    return;
+  }
   logClient('watching images');
-  gulp.watch(paths.client.assets.images, (event) => {
+  gulp.watch(path.join(config.resources.images.from, '**/*'), (event) => {
     logClientWatchEvent(event);
     cleanImages(() => {
       buildImages(() => {
@@ -568,18 +539,6 @@ function watchImages(callback) {
     });
   });
 }
-
-gulp.task('images', (done) => {
-  cleanImages(() => {
-    buildImages(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('images:watch', ['images'], () => {
-  watchImages();
-});
 
 
 
@@ -595,13 +554,12 @@ function buildClient(done) {
   done = done || noop;
   logClient('building...');
   timeClient('build');
-  mergeStream([
-    buildCss(),
-    buildJs(),
-    buildVendor(),
-    buildImages()
-  ])
-  .on('finish', function() {
+  async.parallel([
+    buildCss,
+    buildJs,
+    buildVendor,
+    buildImages
+  ], () => {
     buildHtml(() => {
       timeEndClient('build');
       done();
@@ -627,7 +585,14 @@ function watchClient(callback) {
  * @param {Function} done
  */
 function cleanClient(done) {
-  fsExtra.remove(paths.app.client.directory, done);
+  done = done || noop;
+  async.parallel([
+    cleanCss,
+    cleanJs,
+    cleanVendor,
+    cleanImages,
+    cleanHtml
+  ], done);
 }
 
 /**
@@ -640,14 +605,6 @@ function rebuildClient(done) {
   });
 }
 
-gulp.task('clean:client', function(done) {
-  cleanClient(done);
-});
-
-gulp.task('build:client', function(done) {
-  rebuildClient(done);
-});
-
 
 
 /**
@@ -655,8 +612,12 @@ gulp.task('build:client', function(done) {
  */
 
 
-
-const serverTypescript = typescript.createProject(paths.server.tsconfig);
+let serverTypescript;
+if (config.server.tsconfig) {
+  serverTypescript = typescript.createProject(config.server.tsconfig);
+} else {
+  serverTypescript = null;
+}
 
 /**
  * Build server files.
@@ -666,10 +627,18 @@ const serverTypescript = typescript.createProject(paths.server.tsconfig);
  */
 function buildServer(done, includeMaps) {
   done = done || noop;
+  if (!(
+    config.server.from &&
+    config.server.to
+  )) {
+    logSkip('server');
+    return done();
+  }
+
   logServer('building...');
   timeServer('build');
 
-  var stream = gulp.src(paths.server.typescript);
+  var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
 
   if (includeMaps) {
     stream = stream.pipe(sourcemaps.init());
@@ -682,8 +651,8 @@ function buildServer(done, includeMaps) {
   }
 
   return stream
-  .pipe(addSrc(paths.server.html))
-  .pipe(gulp.dest(paths.app.server.directory))
+  .pipe(addSrc(path.join(config.server.from, '**/*.html')))
+  .pipe(gulp.dest(config.server.to))
   .on('finish', () => {
     timeEndServer('build');
     done();
@@ -698,8 +667,11 @@ function buildServer(done, includeMaps) {
  */
 function watchServer(callback, includeMaps) {
   callback = callback || noop;
+  if (!config.server.from) {
+    return;
+  }
   logServer('watching all files');
-  gulp.watch(paths.server.typescript, (event) => {
+  gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
     rebuildServer(callback, !!includeMaps);
   });
@@ -710,7 +682,12 @@ function watchServer(callback, includeMaps) {
  * @param {Function} done
  */
 function cleanServer(done) {
-  fsExtra.remove(paths.app.server.directory, done);
+  done = done || noop;
+  if (!config.server.to) {
+    logSkip('server-clean');
+    return done();
+  }
+  removePath(config.server.to, done);
 }
 
 /**
@@ -724,32 +701,33 @@ function rebuildServer(done, includeMaps) {
   });
 }
 
-gulp.task('clean:server', (done) => {
-  cleanServer(done);
-});
-
-gulp.task('build:server', (done) => {
-  rebuildServer(done);
-});
-
 
 
 /**
- * Git SHA
+ * Git commit
  */
 
-function writeGitSha(done) {
+function writeGitCommit(done) {
   done = done || noop;
-  const sha = child_process.execSync('git rev-parse HEAD');
-  fsExtra.outputFile(paths.app.gitSha, sha, (err) => {
+  if (!config.gitCommit) {
+    logSkip('gitCommit');
+    return done();
+  }
+  const commit = child_process.execSync('git rev-parse HEAD');
+  fsExtra.outputFile(config.gitCommit, commit, (err) => {
     if (err) console.log(err);
     done();
   });
 }
 
-gulp.task('git-sha', (done) => {
-  writeGitSha(done);
-});
+function cleanGitCommit(done) {
+  done = done || noop;
+  if (!config.gitCommit) {
+    logSkip('gitCommit-clean');
+    return done();
+  }
+  removePath(config.gitCommit, done);
+}
 
 
 
@@ -762,7 +740,16 @@ function build(done, includeMaps) {
   async.parallel([
     buildClient,
     (then) => buildServer(then, !!includeMaps),
-    writeGitSha
+    writeGitCommit
+  ], done);
+}
+
+function clean(done) {
+  done = done || noop;
+  async.parallel([
+    cleanClient,
+    cleanServer,
+    cleanGitCommit
   ], done);
 }
 
@@ -772,7 +759,7 @@ function watch(callback, includeMaps) {
 }
 
 gulp.task('clean', (done) => {
-  fsExtra.remove(paths.app.directory, done);
+  clean(done);
 });
 
 // If we use gulp subtasks, the time report for this task is not useful.
@@ -987,6 +974,10 @@ function logEnvironment(message) {
 
 function logEnvironmentWatchEvent(event) {
   logEnvironment(`${event.path} ${event.type}`);
+}
+
+function logSkip(task) {
+  console.log(`Skipping [${task}]`);
 }
 
 
