@@ -176,13 +176,13 @@ function rebuildHtml(done) {
  * Callback called after index.html is written to disk.
  */
 function watchHtml() {
-  if (!config.client.html.watch) {
+  if (!config.client.html.watch.glob) {
     return;
   }
   logClient('watching html');
-  gulp.watch(config.client.html.watch, (event) => {
+  gulp.watch(config.client.html.watch.glob, (event) => {
     logClientWatchEvent(event);
-    rebuildHtml(config.client.html.watchCallback);
+    rebuildHtml(config.client.html.watch.post);
   });
 }
 
@@ -244,15 +244,15 @@ function cleanCss(done) {
  * Callback called after files are written to disk.
  */
 function watchCss() {
-  if (!config.client.scss.watch) {
+  if (!config.client.scss.watch.glob) {
     return;
   }
   logClient('watching css');
-  gulp.watch(config.client.scss.watch, (event) => {
+  gulp.watch(config.client.scss.watch.glob, (event) => {
     logClientWatchEvent(event);
     cleanCss(() => {
       buildCss(() => {
-        rebuildHtml(config.client.scss.watchCallback);
+        rebuildHtml(config.client.scss.watch.post);
       });
     });
   });
@@ -351,17 +351,17 @@ function buildJs(done) {
  * Callback called after bundle is written to disk.
  */
 function watchJs() {
-  if (!config.client.ts.watch) {
+  if (!config.client.ts.watch.glob) {
     return;
   }
   logClient('watching js');
-  gulp.watch(config.client.ts.watch, (event) => {
+  gulp.watch(config.client.ts.watch.glob, (event) => {
     logClientWatchEvent(event);
     cleanJs(() => {
       timeClient('js build (incremental)');
       bundleJs(() => {
         timeEndClient('js build (incremental)');
-        rebuildHtml(config.client.ts.watch);
+        rebuildHtml(config.client.ts.watch.post);
       });
     });
   });
@@ -457,7 +457,7 @@ function watchVendor() {
     logClientWatchEvent(event);
     cleanVendor(() => {
       buildVendor(() => {
-        rebuildHtml(config.client.vendors.watchCallback);
+        rebuildHtml(config.client.vendors.watch.post);
       });
     });
   });
@@ -529,7 +529,7 @@ function watchImages() {
     logClientWatchEvent(event);
     cleanImages(() => {
       buildImages(() => {
-        rebuildHtml(config.resources.images.watchCallback);
+        rebuildHtml(config.resources.images.watch.post);
       });
     });
   });
@@ -665,7 +665,7 @@ function watchServer(includeMaps) {
   logServer('watching all files');
   gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
-    rebuildServer(config.server.watchCallback, !!includeMaps);
+    rebuildServer(config.server.watch.post, !!includeMaps);
   });
 }
 

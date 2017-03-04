@@ -8,41 +8,62 @@ module.exports = function() {
       html: {
         entry: '',
         bundle: '',
-        watch: '',
-        watchCallback: noop,
+        watch: {
+          glob: '',
+          pre: noop,
+          post: noop
+        },
         inject: {}
       },
       scss: {
         entry: '',
         bundle: '',
-        watch: '',
-        watchCallback: noop
+        watch: {
+          glob: '',
+          pre: noop,
+          post: noop
+        }
       },
       ts: {
         entry: '',
         bundle: '',
-        watch: '',
-        watchCallback: noop,
+        watch: {
+          glob: '',
+          pre: noop,
+          post: noop
+        },
         tsconfig: ''
       },
       vendors: {
         manifest: '',
         bundle: '',
-        watchCallback: noop
+        watch: {
+          // glob: '',
+          pre: noop,
+          post: noop
+        }
       }
     },
     server: {
       from: '',
       to: '',
       tsconfig: '',
-      watchCallback: noop
+      watch: {
+        // glob: '',
+        pre: noop,
+        post: noop
+      }
     },
     resources: {
       images: {
         from: '',
         to: '',
         manifest: '',
-        watchCallback: noop
+        watch: {
+          // glob: '',
+          pre: noop,
+          post: noop
+        },
       }
     },
     gitCommit: ''
@@ -52,7 +73,7 @@ module.exports = function() {
   try {
     customConfig = require(path.join(process.cwd(), 'fullstack.conf'))();
   } catch (e) {
-    console.warn('No config file found');
+    console.warn('Config file not found or invalid', e);
     customConfig = {};
   }
 
