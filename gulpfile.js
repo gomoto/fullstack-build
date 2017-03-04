@@ -182,6 +182,7 @@ function watchHtml() {
   logClient('watching html');
   gulp.watch(config.client.html.watch.glob, (event) => {
     logClientWatchEvent(event);
+    config.client.html.watch.pre(event);
     rebuildHtml(config.client.html.watch.post);
   });
 }
@@ -250,6 +251,7 @@ function watchCss() {
   logClient('watching css');
   gulp.watch(config.client.scss.watch.glob, (event) => {
     logClientWatchEvent(event);
+    config.client.scss.watch.pre(event);
     cleanCss(() => {
       buildCss(() => {
         rebuildHtml(config.client.scss.watch.post);
@@ -357,6 +359,7 @@ function watchJs() {
   logClient('watching js');
   gulp.watch(config.client.ts.watch.glob, (event) => {
     logClientWatchEvent(event);
+    config.client.ts.watch.pre(event);
     cleanJs(() => {
       timeClient('js build (incremental)');
       bundleJs(() => {
@@ -455,6 +458,7 @@ function watchVendor() {
   logClient('watching vendor');
   gulp.watch(config.client.vendors.manifest, (event) => {
     logClientWatchEvent(event);
+    config.client.vendors.watch.pre(event);
     cleanVendor(() => {
       buildVendor(() => {
         rebuildHtml(config.client.vendors.watch.post);
@@ -527,6 +531,7 @@ function watchImages() {
   logClient('watching images');
   gulp.watch(path.join(config.resources.images.from, '**/*'), (event) => {
     logClientWatchEvent(event);
+    config.client.images.watch.pre(event);
     cleanImages(() => {
       buildImages(() => {
         rebuildHtml(config.resources.images.watch.post);
@@ -665,6 +670,7 @@ function watchServer(includeMaps) {
   logServer('watching all files');
   gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
+    config.server.watch.pre(event);
     rebuildServer(config.server.watch.post, !!includeMaps);
   });
 }
