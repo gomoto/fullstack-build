@@ -231,18 +231,6 @@ function watchHtml(callback) {
   });
 }
 
-gulp.task('html', function(done) {
-  rebuildHtml(done);
-});
-
-gulp.task('html:clean', function(done) {
-  cleanHtml(done);
-});
-
-gulp.task('html:watch', ['html'], function() {
-  watchHtml();
-});
-
 
 
 /**
@@ -317,22 +305,6 @@ function watchCss(callback) {
     });
   });
 }
-
-gulp.task('css', function(done) {
-  cleanCss(() => {
-    buildCss(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('css:clean', function(done) {
-  cleanCss(done);
-});
-
-gulp.task('css:watch', ['css'], function() {
-  watchCss();
-});
 
 
 
@@ -468,22 +440,6 @@ function cleanJs(done) {
   });
 }
 
-gulp.task('js', function(done) {
-  cleanJs(() => {
-    buildJs(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('js:clean', function(done) {
-  cleanJs(done);
-});
-
-gulp.task('js:watch', ['js'], function() {
-  watchJs();
-});
-
 
 
 /**
@@ -567,22 +523,6 @@ function watchVendor(callback) {
   });
 }
 
-gulp.task('vendor', function(done) {
-  cleanVendor(() => {
-    buildVendor(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('vendor:clean', function(done) {
-  cleanVendor(done);
-});
-
-gulp.task('vendor:watch', ['vendor'], function() {
-  watchVendor();
-});
-
 
 
 /**
@@ -656,18 +596,6 @@ function watchImages(callback) {
   });
 }
 
-gulp.task('images', (done) => {
-  cleanImages(() => {
-    buildImages(() => {
-      rebuildHtml(done);
-    });
-  });
-});
-
-gulp.task('images:watch', ['images'], () => {
-  watchImages();
-});
-
 
 
 /**
@@ -732,14 +660,6 @@ function rebuildClient(done) {
     buildClient(done);
   });
 }
-
-gulp.task('clean:client', function(done) {
-  cleanClient(done);
-});
-
-gulp.task('build:client', function(done) {
-  rebuildClient(done);
-});
 
 
 
@@ -837,14 +757,6 @@ function rebuildServer(done, includeMaps) {
   });
 }
 
-gulp.task('clean:server', (done) => {
-  cleanServer(done);
-});
-
-gulp.task('build:server', (done) => {
-  rebuildServer(done);
-});
-
 
 
 /**
@@ -872,10 +784,6 @@ function cleanGitCommit(done) {
   }
   removeFile(config.gitCommit, done);
 }
-
-gulp.task('git-commit', (done) => {
-  writeGitCommit(done);
-});
 
 
 
