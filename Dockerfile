@@ -7,8 +7,6 @@ RUN npm install --global gulp
 COPY package.json ./
 RUN npm install
 
-COPY gulpfile.js ./
-
 COPY install ./
 RUN chmod +x ./install
 
@@ -22,5 +20,9 @@ COPY clean ./
 RUN chmod +x ./clean
 
 VOLUME /project
+
+COPY empty.conf.js ./
+
+COPY gulpfile.js ./
 
 CMD ["./build"]
