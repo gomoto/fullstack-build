@@ -14,7 +14,6 @@ const browserify = require('browserify-incremental');
 const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
-const deepExtend = require('deep-extend');
 const dotenv = require('dotenv');
 const envify = require('envify/custom');
 const fs = require('fs');
@@ -37,6 +36,7 @@ const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 
+const config = require('./config')();
 const noop = Function.prototype;
 
 /**
@@ -119,19 +119,6 @@ function removeEmptyDirectory(current, root) {
   // Remove empty parent directory.
   removeEmptyDirectory(path.dirname(current), root);
 }
-
-// Config
-
-const emptyConfig = require('./empty.conf')();
-
-let customConfig;
-try {
-  customConfig = require(path.join(process.cwd(), 'fullstack.conf'))();
-} catch (e) {
-  customConfig = {};
-}
-
-const config = deepExtend({}, emptyConfig, customConfig);
 
 const paths = {
   env: '.env'

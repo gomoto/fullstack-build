@@ -21,7 +21,7 @@ RUN chmod +x ./clean
 
 VOLUME /project
 
-COPY empty.conf.js ./
+COPY config.js ./
 
 COPY gulpfile.js ./
 
