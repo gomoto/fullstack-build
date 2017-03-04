@@ -51,35 +51,18 @@ function hashGlob(filepath) {
 }
 
 /**
- * Remove file. Then remove ancestor directories that are empty.
+ * Remove file or directory. Then remove ancestor directories that are empty.
  */
-function removeFile(filepath, done) {
+function removePath(entity, done) {
   done = done || noop;
-  // If you need to go to parent of working directory to get to filepath,
-  // then filepath is not inside working directory.
-  if (path.relative(process.cwd(), filepath).slice(0,2) === '..') {
-    throw new Error('filepath must live inside working directory');
+  // If you need to go to parent of working directory to get to entity, then
+  // entity is not inside working directory. This check also works on globs.
+  if (path.relative(process.cwd(), entity).slice(0,2) === '..') {
+    throw new Error('entity must live inside working directory');
   }
-  fs.unlink(filepath, () => {
+  rimraf(entity, () => {
     // Remove empty directories until working directory is reached.
-    removeEmptyDirectory(path.dirname(filepath), process.cwd());
-    done();
-  });
-}
-
-/**
- * Remove directory. Then remove ancestor directories that are empty.
- */
-function removeDirectory(directory, done) {
-  done = done || noop;
-  // If you need to go to parent of working directory to get to directory,
-  // then directory is not inside working directory.
-  if (path.relative(process.cwd(), directory).slice(0,2) === '..') {
-    throw new Error('directory must live inside working directory');
-  }
-  rimraf(directory, () => {
-    // Remove empty directories until working directory is reached.
-    removeEmptyDirectory(path.dirname(directory), process.cwd());
+    removeEmptyDirectory(path.dirname(entity), process.cwd());
     done();
   });
 }
@@ -91,7 +74,7 @@ function removeFiles(filepaths, done) {
   done = done || noop;
   const tasks = filepaths.map((filepath) => {
     return (then) => {
-      removeFile(filepath, then);
+      removePath(filepath, then);
     }
   });
   async.parallel(tasks, done);
@@ -186,7 +169,7 @@ function cleanHtml(done) {
     return done();
   }
   timeClient('html clean');
-  removeFile(config.client.html.bundle, () => {
+  removePath(config.client.html.bundle, () => {
     timeEndClient('html clean');
     done();
   });
@@ -556,7 +539,7 @@ function cleanImages(done) {
     return done();
   }
   timeClient('images clean');
-  removeDirectory(config.resources.images.to, () => {
+  removePath(config.resources.images.to, () => {
     timeEndClient('images clean');
     done();
   });
@@ -730,7 +713,7 @@ function cleanServer(done) {
     logSkip('server-clean');
     return done();
   }
-  removeDirectory(config.server.to, done);
+  removePath(config.server.to, done);
 }
 
 /**
@@ -769,7 +752,7 @@ function cleanGitCommit(done) {
     logSkip('gitCommit-clean');
     return done();
   }
-  removeFile(config.gitCommit, done);
+  removePath(config.gitCommit, done);
 }
 
 
