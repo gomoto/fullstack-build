@@ -18,7 +18,6 @@ const dotenv = require('dotenv');
 const envify = require('envify/custom');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
-const glob = require('glob');
 const gulp = require('gulp');
 const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
@@ -52,6 +51,7 @@ function hashGlob(filepath) {
 
 /**
  * Remove file or directory. Then remove ancestor directories that are empty.
+ * Entity can be a glob.
  */
 function removePath(entity, done) {
   done = done || noop;
@@ -65,19 +65,6 @@ function removePath(entity, done) {
     removeEmptyDirectory(path.dirname(entity), process.cwd());
     done();
   });
-}
-
-/**
- * Remove multiple files.
- */
-function removeFiles(filepaths, done) {
-  done = done || noop;
-  const tasks = filepaths.map((filepath) => {
-    return (then) => {
-      removePath(filepath, then);
-    }
-  });
-  async.parallel(tasks, done);
 }
 
 /**
@@ -247,11 +234,9 @@ function cleanCss(done) {
     return done();
   }
   timeClient('css clean');
-  glob(hashGlob(config.client.scss.bundle), (error, files) => {
-    removeFiles(files, () => {
-      timeEndClient('css clean');
-      done();
-    });
+  removePath(hashGlob(config.client.scss.bundle), () => {
+    timeEndClient('css clean');
+    done();
   });
 }
 
@@ -402,11 +387,9 @@ function cleanJs(done) {
     return done();
   }
   timeClient('js clean');
-  glob(hashGlob(config.client.ts.bundle), (error, files) => {
-    removeFiles(files, () => {
-      timeEndClient('js clean');
-      done();
-    });
+  removePath(hashGlob(config.client.ts.bundle), () => {
+    timeEndClient('js clean');
+    done();
   });
 }
 
@@ -464,11 +447,9 @@ function cleanVendor(done) {
     return done();
   }
   timeClient('vendor clean');
-  glob(hashGlob(config.client.vendors.bundle), (error, files) => {
-    removeFiles(files, () => {
-      timeEndClient('vendor clean');
-      done();
-    });
+  removePath(hashGlob(config.client.vendors.bundle), () => {
+    timeEndClient('vendor clean');
+    done();
   });
 }
 
