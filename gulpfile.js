@@ -15,7 +15,6 @@ const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
 const dotenv = require('dotenv');
-const envify = require('envify/custom');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const gulp = require('gulp');
@@ -336,12 +335,6 @@ function buildJs(done) {
 
   // transpile TypeScript
   jsBundle.plugin(tsify, { project: config.client.ts.tsconfig });
-
-  // replace environment variables
-  jsBundle.transform(envify({
-    _: 'purge',
-    NODE_ENV: process.env.NODE_ENV || 'development'
-  }));
 
   vendors.forEach((vendor) => {
     jsBundle.external(vendor);
