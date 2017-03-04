@@ -173,17 +173,16 @@ function rebuildHtml(done) {
 
 /**
  * Rebuild index.html whenever any html file changes.
- * @param  {Function} callback called after index.html is written to disk
+ * Callback called after index.html is written to disk.
  */
-function watchHtml(callback) {
-  callback = callback || noop;
+function watchHtml() {
   if (!config.client.html.watch) {
     return;
   }
   logClient('watching html');
   gulp.watch(config.client.html.watch, (event) => {
     logClientWatchEvent(event);
-    rebuildHtml(callback);
+    rebuildHtml(config.client.html.watchCallback);
   });
 }
 
@@ -242,10 +241,9 @@ function cleanCss(done) {
 /**
  * Rebuild index.css and its sourcemap whenever any scss file changes.
  * Rebuild index.html to update index.css hash.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchCss(callback) {
-  callback = callback || noop;
+function watchCss() {
   if (!config.client.scss.watch) {
     return;
   }
@@ -254,7 +252,7 @@ function watchCss(callback) {
     logClientWatchEvent(event);
     cleanCss(() => {
       buildCss(() => {
-        rebuildHtml(callback);
+        rebuildHtml(config.client.scss.watchCallback);
       });
     });
   });
@@ -350,10 +348,9 @@ function buildJs(done) {
  * Rebuild index.js and its sourcemap whenever any typescript file changes.
  * Rebuild index.html to update index.js hash.
  * NOTE: buildJs must be called at least once before this.
- * @param  {Function} callback called after bundle is written to disk
+ * Callback called after bundle is written to disk.
  */
-function watchJs(callback) {
-  callback = callback || noop;
+function watchJs() {
   if (!config.client.ts.watch) {
     return;
   }
@@ -364,7 +361,7 @@ function watchJs(callback) {
       timeClient('js build (incremental)');
       bundleJs(() => {
         timeEndClient('js build (incremental)');
-        rebuildHtml(callback);
+        rebuildHtml(config.client.ts.watch);
       });
     });
   });
@@ -449,10 +446,9 @@ function cleanVendor(done) {
 /**
  * Rebuild vendor bundle and its sourcemap whenever vendors.json changes.
  * Rebuild index.html to update file hash.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchVendor(callback) {
-  callback = callback || noop;
+function watchVendor() {
   if (!config.client.vendors.manifest) {
     return;
   }
@@ -461,7 +457,7 @@ function watchVendor(callback) {
     logClientWatchEvent(event);
     cleanVendor(() => {
       buildVendor(() => {
-        rebuildHtml(callback);
+        rebuildHtml(config.client.vendors.watchCallback);
       });
     });
   });
@@ -522,10 +518,9 @@ function cleanImages(done) {
 /**
  * Rebuild images whenever images change.
  * Rebuild index.html to update file hashes.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchImages(callback) {
-  callback = callback || noop;
+function watchImages() {
   if (!config.resources.images.from) {
     return;
   }
@@ -534,7 +529,7 @@ function watchImages(callback) {
     logClientWatchEvent(event);
     cleanImages(() => {
       buildImages(() => {
-        rebuildHtml(callback);
+        rebuildHtml(config.resources.images.watchCallback);
       });
     });
   });
@@ -569,15 +564,13 @@ function buildClient(done) {
 
 /**
  * Watch each build cycle independently.
- * @param  {Function} callback passed to each client watch function
  */
-function watchClient(callback) {
-  callback = callback || noop;
-  watchCss(callback);
-  watchJs(callback);
-  watchVendor(callback);
-  watchImages(callback);
-  watchHtml(callback);
+function watchClient() {
+  watchCss();
+  watchJs();
+  watchVendor();
+  watchImages();
+  watchHtml();
 }
 
 /**
@@ -662,18 +655,17 @@ function buildServer(done, includeMaps) {
 /**
  * Watch server files.
  * Rebuild server files with sourcemaps.
- * @param  {Function} callback called whenever a server file changes
+ * Callback called whenever a server file changes.
  * @param {boolean} includeMaps indicates whether or not to include sourcemaps
  */
-function watchServer(callback, includeMaps) {
-  callback = callback || noop;
+function watchServer(includeMaps) {
   if (!config.server.from) {
     return;
   }
   logServer('watching all files');
   gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
-    rebuildServer(callback, !!includeMaps);
+    rebuildServer(config.server.watchCallback, !!includeMaps);
   });
 }
 
@@ -753,9 +745,9 @@ function clean(done) {
   ], done);
 }
 
-function watch(callback, includeMaps) {
-  watchClient(callback);
-  watchServer(callback, !!includeMaps);
+function watch(includeMaps) {
+  watchClient();
+  watchServer(!!includeMaps);
 }
 
 gulp.task('clean', (done) => {

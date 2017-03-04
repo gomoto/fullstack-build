@@ -1,5 +1,6 @@
 const deepExtend = require('deep-extend');
 const path = require('path');
+const noop = Function.prototype;
 
 module.exports = function() {
   const emptyConfig = {
@@ -8,34 +9,40 @@ module.exports = function() {
         entry: '',
         bundle: '',
         watch: '',
+        watchCallback: noop,
         inject: {}
       },
       scss: {
         entry: '',
         bundle: '',
-        watch: ''
+        watch: '',
+        watchCallback: noop
       },
       ts: {
         entry: '',
         bundle: '',
         watch: '',
+        watchCallback: noop,
         tsconfig: ''
       },
       vendors: {
         manifest: '',
-        bundle: ''
+        bundle: '',
+        watchCallback: noop
       }
     },
     server: {
       from: '',
       to: '',
-      tsconfig: ''
+      tsconfig: '',
+      watchCallback: noop
     },
     resources: {
       images: {
         from: '',
         to: '',
-        manifest: ''
+        manifest: '',
+        watchCallback: noop
       }
     },
     gitCommit: ''
