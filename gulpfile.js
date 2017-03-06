@@ -185,6 +185,7 @@ function watchHtml() {
     config.client.html.watch.pre(event);
     rebuildHtml(config.client.html.watch.post);
   });
+  config.client.html.watch.init();
 }
 
 
@@ -258,6 +259,7 @@ function watchCss() {
       });
     });
   });
+  config.client.scss.watch.init();
 }
 
 
@@ -368,6 +370,7 @@ function watchJs() {
       });
     });
   });
+  config.client.ts.watch.init();
 }
 
 /**
@@ -465,6 +468,7 @@ function watchVendor() {
       });
     });
   });
+  config.client.vendors.watch.init();
 }
 
 
@@ -538,6 +542,7 @@ function watchImages() {
       });
     });
   });
+  config.resources.images.watch.init();
 }
 
 
@@ -673,6 +678,7 @@ function watchServer(includeMaps) {
     config.server.watch.pre(event);
     rebuildServer(config.server.watch.post, !!includeMaps);
   });
+  config.server.watch.init();
 }
 
 /**

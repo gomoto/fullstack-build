@@ -10,6 +10,7 @@ module.exports = function() {
         bundle: '',
         watch: {
           glob: '',
+          init: noop,
           pre: noop,
           post: noop
         },
@@ -20,6 +21,7 @@ module.exports = function() {
         bundle: '',
         watch: {
           glob: '',
+          init: noop,
           pre: noop,
           post: noop
         }
@@ -29,6 +31,7 @@ module.exports = function() {
         bundle: '',
         watch: {
           glob: '',
+          init: noop,
           pre: noop,
           post: noop
         },
@@ -39,6 +42,7 @@ module.exports = function() {
         bundle: '',
         watch: {
           // glob: '',
+          init: noop,
           pre: noop,
           post: noop
         }
@@ -50,6 +54,7 @@ module.exports = function() {
       tsconfig: '',
       watch: {
         // glob: '',
+        init: noop,
         pre: noop,
         post: noop
       }
@@ -61,11 +66,13 @@ module.exports = function() {
         manifest: '',
         watch: {
           // glob: '',
+          init: noop,
           pre: noop,
           post: noop
         },
       }
     },
+    services: {},
     gitCommit: ''
   };
 
