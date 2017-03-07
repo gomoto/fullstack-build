@@ -1,4 +1,4 @@
-FROM node:7.5.0
+FROM gomoto/node-docker-compose:latest
 
 WORKDIR /
 
@@ -22,7 +22,8 @@ RUN chmod +x ./clean
 VOLUME /project
 
 COPY config.js ./
-
+COPY docker-compose.js ./
+COPY docker-service.js ./
 COPY gulpfile.js ./
 
 CMD ["./build"]

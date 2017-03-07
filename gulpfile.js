@@ -37,6 +37,16 @@ const uglify = require('gulp-uglify');
 const config = require('./config')();
 const noop = Function.prototype;
 
+const DockerServiceFactory = require('./docker-service');
+
+// Create a DockerService instance for each key in config.services object.
+// DockerService instance are exposed to the project configuration module.
+const services = {};
+Object.keys(config.services).forEach((key) => {
+  console.log(`Creating service: ${key}`);
+  services[key] = DockerServiceFactory(config.services[key]);
+});
+
 /**
  * file.css -> file-*.css?(.map)
  * file.js -> file-*.js?(.map)
@@ -678,7 +688,7 @@ function watchServer(includeMaps) {
     config.server.watch.pre(event);
     rebuildServer(config.server.watch.post, !!includeMaps);
   });
-  config.server.watch.init();
+  config.server.watch.init(services);
 }
 
 /**
