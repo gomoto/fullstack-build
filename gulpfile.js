@@ -686,7 +686,9 @@ function watchServer(includeMaps) {
   gulp.watch(path.join(config.server.from, '**/*'), (event) => {
     logServerWatchEvent(event);
     config.server.watch.pre(event);
-    rebuildServer(config.server.watch.post, !!includeMaps);
+    rebuildServer(() => {
+      config.server.watch.post(services);
+    }, !!includeMaps);
   });
   config.server.watch.init(services);
 }

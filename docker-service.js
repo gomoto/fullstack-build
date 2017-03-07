@@ -23,7 +23,7 @@ class DockerService {
     }
     if (this.fork) {
       this.busy = true;
-      this.fork.once('exit', () => {
+      this.fork.once('exit', (code) => {
         console.log(`service has stopped [exit code ${code}]: ${this.name}`);
         this.start();
         this.busy = false;
