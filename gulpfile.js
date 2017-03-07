@@ -22,6 +22,7 @@ const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
 const jsonfile = require('jsonfile');
+const livereload = require('gulp-livereload');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
@@ -152,7 +153,8 @@ function buildHtml(done) {
   .on('finish', () => {
     timeEndClient('html build');
     done();
-  });
+  })
+  .pipe(livereload());
 }
 
 /**
@@ -586,6 +588,7 @@ function buildClient(done) {
  * Watch each build cycle independently.
  */
 function watchClient() {
+  livereload.listen();
   watchCss();
   watchJs();
   watchVendor();

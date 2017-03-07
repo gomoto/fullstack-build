@@ -26,4 +26,6 @@ COPY docker-compose.js ./
 COPY docker-service.js ./
 COPY gulpfile.js ./
 
+EXPOSE 35729
+
 CMD ["./build"]
