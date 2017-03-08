@@ -1,14 +1,3 @@
-// Project directory is one level below this file.
-const assert = require('assert');
-const path = require('path');
-assert.equal(path.dirname(process.cwd()), __dirname);
-
-const internalConfig = {
-  package: '/project/package.json',
-  src: '/project/src',
-  build: '/project/build'
-};
-
 // Module require() is relative to current working directory.
 // Local require(./[...]) is relative to __dirname and cannot be used to access
 // project files.
@@ -30,6 +19,7 @@ const imagemin = require('gulp-imagemin');
 const jsonfile = require('jsonfile');
 const livereload = require('gulp-livereload');
 const ncp = require('ncp').ncp;
+const path = require('path');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
@@ -41,6 +31,12 @@ const tcp = require('tcp-port-used');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
+
+const internalConfig = {
+  package: '/project/package.json',
+  src: '/project/src',
+  build: '/project/build'
+};
 
 // Provide copy of internal config
 const config = require('./config')({
