@@ -29,6 +29,7 @@ const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
 const jsonfile = require('jsonfile');
 const livereload = require('gulp-livereload');
+const ncp = require('ncp').ncp;
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
@@ -122,6 +123,49 @@ if (config.client.vendors.manifest) {
   vendors = [];
 }
 
+
+
+/**
+ * npm install
+ */
+
+/**
+ * Copy package.json to project directory, then npm install.
+ * We want node_modules in project directory, but package.json might not be there.
+ * @param {Function} done
+ */
+function npmInstall(done) {
+  done = done || noop;
+  timeClient('npm-install');
+  ncp(config.package, internalConfig.package, function (err) {
+    if (err) {
+      return console.error(err);
+    }
+    spawn('npm', ['install', '--only=production'], () => {
+      timeEndClient('npm-install');
+      done();
+    });
+  });
+}
+
+function spawn(command, args, done) {
+  done = done || noop;
+  // Guard against accidentally invoking handler functions multiple times.
+  let alreadyDone = false;
+  const fork = child_process.spawn(command, args);
+  fork.stdout.on('data', (data) => process.stdout.write(data));
+  fork.stderr.on('data', (data) => process.stderr.write(data));
+  fork.on('error', (err) => {
+    if (alreadyDone) return;
+    alreadyDone = true;
+    done(err);
+  });
+  fork.on('exit', () => {
+    if (alreadyDone) return;
+    alreadyDone = true;
+    done();
+  });
+}
 
 
 /**
@@ -766,11 +810,14 @@ function cleanGitCommit(done) {
 
 function build(done, includeMaps) {
   done = done || noop;
-  async.parallel([
-    buildClient,
-    (then) => buildServer(then, !!includeMaps),
-    writeGitCommit
-  ], done);
+  npmInstall((err) => {
+    if (err) return done(err);
+    async.parallel([
+      buildClient,
+      (then) => buildServer(then, !!includeMaps),
+      writeGitCommit
+    ], done);
+  });
 }
 
 function clean(done) {

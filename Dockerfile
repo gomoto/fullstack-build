@@ -1,4 +1,4 @@
-FROM gomoto/node-docker-compose:latest
+FROM gomoto/node-docker-compose:0.0.2
 
 WORKDIR /
 
@@ -6,9 +6,6 @@ RUN npm install --global gulp
 
 COPY package.json ./
 RUN npm install
-
-COPY install ./
-RUN chmod +x ./install
 
 COPY build ./
 RUN chmod +x ./build

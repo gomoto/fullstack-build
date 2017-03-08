@@ -2,8 +2,11 @@ const deepExtend = require('deep-extend');
 const path = require('path');
 const noop = Function.prototype;
 
-module.exports = function() {
+// All paths are relative to this container,
+// even if defined within fullstack.conf file.
+module.exports = function(config) {
   const emptyConfig = {
+    package: path.join(config.src, 'package.json'),
     client: {
       html: {
         entry: '',

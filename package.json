@@ -27,6 +27,7 @@
     "html-minifier": "^3.2.2",
     "html-minifier-stream": "0.1.0",
     "jsonfile": "^2.4.0",
+    "ncp": "^2.0.0",
     "rimraf": "^2.6.1",
     "tcp-port-used": "^0.1.2",
     "tsify": "^2.0.2",

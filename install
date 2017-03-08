@@ -1,6 +1,0 @@
-#!/bin/sh
-
-# Install project dependencies.
-cd ./project
-npm install --only=production
-cd ..
