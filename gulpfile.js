@@ -3,6 +3,12 @@ const assert = require('assert');
 const path = require('path');
 assert.equal(path.dirname(process.cwd()), __dirname);
 
+const internalConfig = {
+  package: '/project/package.json',
+  src: '/project/src',
+  build: '/project/build'
+};
+
 // Module require() is relative to current working directory.
 // Local require(./[...]) is relative to __dirname and cannot be used to access
 // project files.
@@ -35,7 +41,11 @@ const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 
-const config = require('./config')();
+// Provide copy of internal config
+const config = require('./config')({
+  src: internalConfig.src,
+  build: internalConfig.build
+});
 const noop = Function.prototype;
 
 const DockerServiceFactory = require('./docker-service');
@@ -65,14 +75,14 @@ function hashGlob(filepath) {
  */
 function removePath(entity, done) {
   done = done || noop;
-  // If you need to go to parent of working directory to get to entity, then
-  // entity is not inside working directory. This check also works on globs.
-  if (path.relative(process.cwd(), entity).slice(0,2) === '..') {
-    throw new Error('entity must live inside working directory');
+  // If you need to go to parent of build directory to get to entity, then
+  // entity is not inside build directory. This check also works on globs.
+  if (path.relative(internalConfig.build, entity).slice(0,2) === '..') {
+    throw new Error('entity must live inside build directory');
   }
   rimraf(entity, () => {
-    // Remove empty directories until working directory is reached.
-    removeEmptyDirectory(path.dirname(entity), process.cwd());
+    // Remove empty directories until build  directory is reached.
+    removeEmptyDirectory(path.dirname(entity), internalConfig.build);
     done();
   });
 }
@@ -107,7 +117,7 @@ const paths = {
 // Read vendors manifest if there is one.
 let vendors;
 if (config.client.vendors.manifest) {
-  vendors = jsonfile.readFileSync(`./${config.client.vendors.manifest}`, { throws: false });
+  vendors = jsonfile.readFileSync(`${config.client.vendors.manifest}`, { throws: false });
 } else {
   vendors = [];
 }
@@ -732,7 +742,7 @@ function writeGitCommit(done) {
     logSkip('gitCommit');
     return done();
   }
-  const commit = child_process.execSync('git rev-parse HEAD');
+  const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
   fsExtra.outputFile(config.gitCommit, commit, (err) => {
     if (err) console.log(err);
     done();

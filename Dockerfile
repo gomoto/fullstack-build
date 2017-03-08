@@ -19,7 +19,7 @@ RUN chmod +x ./watch
 COPY clean ./
 RUN chmod +x ./clean
 
-VOLUME /project
+VOLUME ["/project/src", "/project/build"]
 
 COPY config.js ./
 COPY docker-compose.js ./

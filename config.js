@@ -78,7 +78,7 @@ module.exports = function() {
 
   let customConfig;
   try {
-    customConfig = require(path.join(process.cwd(), 'fullstack.conf'))();
+    customConfig = require(path.join(config.src, 'fullstack.conf'))(config);
   } catch (e) {
     console.warn('Config file not found or invalid', e);
     customConfig = {};
