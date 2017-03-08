@@ -16,13 +16,13 @@ RUN chmod +x ./watch
 COPY clean ./
 RUN chmod +x ./clean
 
+EXPOSE 35729
+
 VOLUME ["/project/src", "/project/build"]
 
 COPY config.js ./
 COPY docker-compose.js ./
 COPY docker-service.js ./
 COPY gulpfile.js ./
-
-EXPOSE 35729
 
 CMD ["./build"]

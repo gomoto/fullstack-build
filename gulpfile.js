@@ -18,7 +18,6 @@ const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
 const jsonfile = require('jsonfile');
 const livereload = require('gulp-livereload');
-const ncp = require('ncp').ncp;
 const path = require('path');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
@@ -126,29 +125,24 @@ if (config.client.vendors.manifest) {
  */
 
 /**
- * Copy package.json to project directory, then npm install.
- * We want node_modules in project directory, but package.json might not be there.
+ * Install npm packages in project directory.
+ * Type support in IDEs assumes packages are installed alongside source code.
  * @param {Function} done
  */
 function npmInstall(done) {
   done = done || noop;
   timeClient('npm-install');
-  ncp(config.package, internalConfig.package, function (err) {
-    if (err) {
-      return console.error(err);
-    }
-    spawn('npm', ['install', '--only=production'], () => {
-      timeEndClient('npm-install');
-      done();
-    });
+  spawn('npm', ['install', '--only=production'], { cwd: internalConfig.src }, () => {
+    timeEndClient('npm-install');
+    done();
   });
 }
 
-function spawn(command, args, done) {
+function spawn(command, args, options, done) {
   done = done || noop;
   // Guard against accidentally invoking handler functions multiple times.
   let alreadyDone = false;
-  const fork = child_process.spawn(command, args);
+  const fork = child_process.spawn(command, args, options);
   fork.stdout.on('data', (data) => process.stdout.write(data));
   fork.stderr.on('data', (data) => process.stderr.write(data));
   fork.on('error', (err) => {
