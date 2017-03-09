@@ -125,14 +125,14 @@ if (config.client.vendors.manifest) {
  */
 
 /**
- * Install npm packages in project directory.
- * Type support in IDEs assumes packages are installed alongside source code.
+ * Install npm packages in given directory.
+ * @param {string} directory
  * @param {Function} done
  */
-function npmInstall(done) {
+function npmInstall(directory, done) {
   done = done || noop;
   timeClient('npm-install');
-  spawn('npm', ['install', '--only=production'], { cwd: internalConfig.src }, () => {
+  spawn('npm', ['install', '--only=production'], { cwd: directory }, () => {
     timeEndClient('npm-install');
     done();
   });
@@ -845,7 +845,9 @@ function cleanGitCommit(done) {
 
 function build(done, includeMaps) {
   done = done || noop;
-  npmInstall((err) => {
+  // Install packages in project directory.
+  // Type support in IDEs assumes packages are installed alongside source code.
+  npmInstall(internalConfig.src, (err) => {
     if (err) return done(err);
     async.parallel([
       buildClient,
