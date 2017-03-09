@@ -673,9 +673,29 @@ function rebuildClient(done) {
 
 
 /**
- * Server
+ * Copy server package.json to build directory.
  */
+function copyPackage(done) {
+ done = done || noop;
+ if (!config.server.package) {
+   logSkip('server package.json');
+   return done();
+ }
+ timeClient('copy-package');
+ const to = `${internalConfig.build}/${path.relative(internalConfig.src, config.server.package)}`;
+ fsExtra.copy(config.server.package, to, (err) => {
+   if (err) {
+     console.error(err);
+     return done(err);
+   }
+   timeEndClient('copy-package');
+   done();
+ });
+}
 
+/**
+ * Server JavaScript
+ */
 
 let serverTypescript;
 if (config.server.tsconfig) {
@@ -685,23 +705,22 @@ if (config.server.tsconfig) {
 }
 
 /**
- * Build server files.
+ * Build server typescript files.
  * @param {Function} done called after files are written to disk
  * @param {boolean} includeMaps indicates whether or not to include sourcemaps
  * @return {stream}
  */
-function buildServer(done, includeMaps) {
+function buildServerJs(done, includeMaps) {
   done = done || noop;
   if (!(
     config.server.from &&
     config.server.to
   )) {
-    logSkip('server');
+    logSkip('server js');
     return done();
   }
 
-  logServer('building...');
-  timeServer('build');
+  timeServer('js build');
 
   var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
 
@@ -719,10 +738,31 @@ function buildServer(done, includeMaps) {
   .pipe(addSrc(path.join(config.server.from, '**/*.html')))
   .pipe(gulp.dest(config.server.to))
   .on('finish', () => {
+    timeEndServer('js build');
+    done();
+  });
+}
+
+
+
+/**
+ * Build server files.
+ * @param {Function} done called after all server files are written to disk
+ */
+function buildServer(done, includeMaps) {
+  done = done || noop;
+  logServer('building...');
+  timeServer('build');
+  async.parallel([
+    copyPackage,
+    (then) => buildServerJs(then, includeMaps)
+  ], () => {
     timeEndServer('build');
     done();
   });
 }
+
+
 
 /**
  * Watch server files.

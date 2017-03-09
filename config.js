@@ -52,6 +52,7 @@ module.exports = function(config) {
       }
     },
     server: {
+      package: '',
       from: '',
       to: '',
       tsconfig: '',
