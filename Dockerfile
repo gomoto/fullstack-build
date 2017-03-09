@@ -1,6 +1,11 @@
 FROM gomoto/node-docker-compose:0.0.2
 
-WORKDIR /
+VOLUME ["/src", "/build"]
+
+# LiveReload port
+EXPOSE 35729
+
+WORKDIR /fullstack
 
 RUN npm install --global gulp
 
@@ -15,10 +20,6 @@ RUN chmod +x ./watch
 
 COPY clean ./
 RUN chmod +x ./clean
-
-EXPOSE 35729
-
-VOLUME ["/project/src", "/project/build"]
 
 COPY config.js ./
 COPY docker-compose.js ./

@@ -31,10 +31,10 @@ const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 
+// Absolute paths
 const internalConfig = {
-  package: '/project/package.json',
-  src: '/project/src',
-  build: '/project/build'
+  src: '/src',
+  build: '/build'
 };
 
 // Provide copy of internal config
@@ -193,7 +193,7 @@ function buildHtml(done) {
   .pipe(revReplace({
     manifest: gulp.src(config.resources.images.manifest)
   }))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('html build');
     done();
@@ -272,8 +272,8 @@ function buildCss(done) {
   .pipe(autoprefixer({ browsers: ['last 2 versions'] }))
   .pipe(rename(config.client.scss.bundle))
   .pipe(rev())
-  .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(sourcemaps.write('/'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     done();
     timeEndClient('css build');
@@ -359,8 +359,8 @@ function bundleJs(done) {
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
   .pipe(rev())
-  .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(sourcemaps.write('/'))
+  .pipe(gulp.dest('/'))
   .on('finish', function() {
     done();
   });
@@ -471,7 +471,12 @@ function buildVendor(done) {
   const b = browserify({ debug: true });
 
   vendors.forEach((vendor) => {
-    b.require(vendor);
+    // b.require(vendor);// For testing vendor-loading failures.
+    // Vendor modules must be required relative to src directory.
+    b.require(`./node_modules/${vendor}`, {
+      basedir: internalConfig.src,
+      expose: vendor
+    });
   });
 
   return b.bundle()
@@ -481,8 +486,8 @@ function buildVendor(done) {
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
   .pipe(rev())
-  .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(sourcemaps.write('/'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('vendor build');
     done();
@@ -555,7 +560,7 @@ function buildImages(done) {
   .pipe(rev())
   .pipe(gulp.dest(config.resources.images.to))
   .pipe(rev.manifest(config.resources.images.manifest))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('images build');
     done();
