@@ -276,7 +276,7 @@ function buildCss(done) {
   .pipe(autoprefixer({ browsers: ['last 2 versions'] }))
   .pipe(rename(config.client.scss.bundle))
   .pipe(rev())
-  .pipe(sourcemaps.write('/'))
+  .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('/'))
   .on('finish', () => {
     done();
@@ -363,7 +363,7 @@ function bundleJs(done) {
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
   .pipe(rev())
-  .pipe(sourcemaps.write('/'))
+  .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('/'))
   .on('finish', function() {
     done();
@@ -490,7 +490,7 @@ function buildVendor(done) {
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
   .pipe(rev())
-  .pipe(sourcemaps.write('/'))
+  .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('vendor build');
