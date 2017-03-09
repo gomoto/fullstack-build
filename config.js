@@ -6,8 +6,8 @@ const noop = Function.prototype;
 // even if defined within fullstack.conf file.
 module.exports = function(config) {
   const emptyConfig = {
-    package: path.join(config.src, 'package.json'),
     client: {
+      package: '',
       html: {
         entry: '',
         bundle: '',

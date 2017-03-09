@@ -126,15 +126,19 @@ if (config.client.vendors.manifest) {
 
 /**
  * Install npm packages in given directory.
- * @param {string} directory
+ * @param {string} pkg path to package.json
  * @param {Function} done
  */
-function npmInstall(directory, done) {
+function npmInstall(pkg, done) {
   done = done || noop;
-  timeClient('npm-install');
-  spawn('npm', ['install', '--only=production'], { cwd: directory }, () => {
-    timeEndClient('npm-install');
-    done();
+  if (!pkg) {
+    logSkip('npm-install');
+    return done();
+  }
+  timeClient(`npm-install ${pkg}`);
+  spawn('npm', ['install', '--only=production'], { cwd: path.dirname(pkg) }, (err) => {
+    timeEndClient(`npm-install ${pkg}`);
+    done(err);
   });
 }
 
@@ -474,7 +478,7 @@ function buildVendor(done) {
     // b.require(vendor);// For testing vendor-loading failures.
     // Vendor modules must be required relative to src directory.
     b.require(`./node_modules/${vendor}`, {
-      basedir: internalConfig.src,
+      basedir: path.dirname(config.client.package),
       expose: vendor
     });
   });
@@ -847,13 +851,17 @@ function build(done, includeMaps) {
   done = done || noop;
   // Install packages in project directory.
   // Type support in IDEs assumes packages are installed alongside source code.
-  npmInstall(internalConfig.src, (err) => {
+  npmInstall(config.client.package, (err) => {
     if (err) return done(err);
-    async.parallel([
-      buildClient,
-      (then) => buildServer(then, !!includeMaps),
-      writeGitCommit
-    ], done);
+    npmInstall(config.server.package, (err) => {
+      if (err) return done(err);
+      // Build, finally
+      async.parallel([
+        buildClient,
+        (then) => buildServer(then, !!includeMaps),
+        writeGitCommit
+      ], done);
+    });
   });
 }
 
