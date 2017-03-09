@@ -4,12 +4,10 @@
 const addSrc = require('gulp-add-src');
 const async = require('async');
 const autoprefixer = require('gulp-autoprefixer');
-const browserSync = require('browser-sync');
 const browserify = require('browserify-incremental');
 const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
-const dotenv = require('dotenv');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const gulp = require('gulp');
@@ -26,7 +24,6 @@ const rimraf = require('rimraf');
 const sass = require('gulp-sass');
 const source = require('vinyl-source-stream');
 const sourcemaps = require('gulp-sourcemaps');
-const tcp = require('tcp-port-used');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
@@ -901,148 +898,6 @@ gulp.task('watch', ['clean'], (done) => {
 
 
 /**
- * Dev
- */
-
-
-
-/**
- * Proxy server state
- */
-const proxy = {
-  server: null,
-  target: null,
-  host: null,
-  port: null
-};
-
-/**
- * Launch or reload proxy server once app server is ready.
- * @param {Function} done called proxy server reloads or initializes
- */
-function launchProxyServer(done) {
-  done = done || noop;
-  const targetIp = process.env.IP || '0.0.0.0';
-  const targetPort = parseInt(process.env.PORT) || 9000;
-  const target = `http://${targetIp}:${targetPort}`;
-  const host = process.env.DEV_HOST || 'local';
-  const port = process.env.DEV_PORT || '7000';
-  const proxyServerName = 'proxy';
-  tcp.waitUntilUsedOnHost(targetPort, targetIp, 100, 1000000)
-  .then(() => {
-    // If browser-sync configuration is still valid, reload.
-    // Otherwise, create new browser-sync server.
-    if (proxy.server) {
-      if (proxy.target === target && proxy.host === host && proxy.port === port) {
-        proxy.server.reload();
-        return done();
-      } else {
-        proxy.server.exit();
-      }
-    }
-
-    // update state
-    proxy.server = browserSync.create(proxyServerName);
-    proxy.server.init({
-      proxy: target,
-      browser: 'google chrome',
-      open: host,
-      port: port
-    }, done);
-    proxy.target = target;
-    proxy.host = host;
-    proxy.port = port;
-  })
-  .catch((err) => {
-    console.error(err.message);
-  });
-}
-
-
-
-var busy = false;
-/**
- * Launch or restart app server.
- * @param {Function} done called after child process spawns
- * @param {boolean} debug activates node debug mode
- */
-function launchServer(done, debug) {
-  if (busy) {
-    return;
-  }
-
-  // Stay busy until child process exits.
-  busy = true;
-
-  done = done || noop;
-
-  // TODO: if debug is true, use flags --debug --debug-brk when running app
-
-  // Build and run app.
-  const dockerCompose = child_process.spawn('docker-compose', ['up', '-d', '--build', '-t', '0', 'app']);
-  dockerCompose.stdout.on('data', (data) => process.stdout.write(data));
-  dockerCompose.stderr.on('data', (data) => process.stdout.write(data));
-  dockerCompose.on('exit', (code) => {
-    busy = false;
-    done();
-  });
-}
-
-
-
-/**
- * Build and serve app.
- * @param {Function} done called after servers have launched
- * @param {boolean} debug activates node debug mode and sourcemaps
- */
-function serve(done, debug) {
-  done = done || noop;
-  debug = !!debug;
-  build(() => {
-    launchServer(() => {
-      launchProxyServer(done);
-    }, debug);
-  }, debug);
-}
-
-/**
- * Serve app and watch files for changes.
- * @param {Function} done called after servers have launched
- * @param {boolean} debug activates node debug mode and sourcemaps
- */
-function dev(done, debug) {
-  done = done || noop;
-  debug = !!debug;
-
-  // load environment variables into process.env
-  dotenv.config({ path: paths.env });
-
-  serve(() => {
-    gulp.watch([paths.env], (event) => {
-      logEnvironmentWatchEvent(event);
-      serve();
-    });
-    watchClient(() => {
-      launchProxyServer();
-    });
-    watchServer(() => {
-      launchServer(launchProxyServer, debug);
-    }, debug);
-    done();
-  }, debug);
-}
-
-gulp.task('dev', ['clean'], (done) => {
-  dev(done, false);
-});
-
-gulp.task('dev:debug', ['clean'], (done) => {
-  dev(done, true);
-})
-
-
-
-/**
  * Loggers
  */
 
@@ -1088,17 +943,7 @@ function timeEndServer(key) {
   console.timeEnd(`${serverLogPrefix} ${key}`);
 }
 
-// Environment
-
-const environmentLogPrefix = chalk.green('[env]');
-
-function logEnvironment(message) {
-  console.log(environmentLogPrefix, message);
-}
-
-function logEnvironmentWatchEvent(event) {
-  logEnvironment(`${event.path} ${event.type}`);
-}
+// Skip
 
 function logSkip(task) {
   console.log(`Skipping [${task}]`);
