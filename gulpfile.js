@@ -685,14 +685,14 @@ function copyPackage(done) {
    logSkip('server package.json');
    return done();
  }
- timeClient('copy-package');
+ timeServer('copy-package');
  const to = `${internalConfig.build}/${path.relative(internalConfig.src, config.server.package)}`;
  fsExtra.copy(config.server.package, to, (err) => {
    if (err) {
      console.error(err);
      return done(err);
    }
-   timeEndClient('copy-package');
+   timeEndServer('copy-package');
    done();
  });
 }
@@ -729,6 +729,7 @@ function buildServerJs(done, includeMaps) {
   var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
 
   if (includeMaps) {
+    console.log('building server js with sourcemaps');
     stream = stream.pipe(sourcemaps.init());
   }
 
@@ -754,6 +755,7 @@ function buildServerJs(done, includeMaps) {
  * @param {Function} done called after all server files are written to disk
  */
 function buildServer(done, includeMaps) {
+  if (includeMaps) console.log('building server with sourcemaps');
   done = done || noop;
   logServer('building...');
   timeServer('build');
@@ -849,6 +851,7 @@ function cleanGitCommit(done) {
 
 function build(done, includeMaps) {
   done = done || noop;
+  if (includeMaps) console.log('building with sourcemaps');
   // Install packages in project directory.
   // Type support in IDEs assumes packages are installed alongside source code.
   npmInstall(config.client.package, (err) => {
@@ -890,9 +893,9 @@ gulp.task('build', ['clean'], (done) => {
 
 gulp.task('watch', ['clean'], (done) => {
   build(() => {
-    watch();
+    watch(true);
     done();
-  });
+  }, true);
 });
 
 
