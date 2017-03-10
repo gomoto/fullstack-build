@@ -205,7 +205,9 @@ function watchHtml() {
   gulp.watch(config.client.html.watch.glob, (event) => {
     logClientWatchEvent(event);
     config.client.html.watch.pre(event);
-    rebuildHtml(config.client.html.watch.post);
+    rebuildHtml(() => {
+      config.client.html.watch.post(event);
+    });
   });
   config.client.html.watch.init();
 }
@@ -277,7 +279,9 @@ function watchCss() {
     config.client.scss.watch.pre(event);
     cleanCss(() => {
       buildCss(() => {
-        rebuildHtml(config.client.scss.watch.post);
+        rebuildHtml(() => {
+          config.client.scss.watch.post(event);
+        });
       });
     });
   });
@@ -389,7 +393,9 @@ function watchJs() {
       timeClient('js build (incremental)');
       bundleJs(() => {
         timeEndClient('js build (incremental)');
-        rebuildHtml(config.client.ts.watch.post);
+        rebuildHtml(() => {
+          config.client.ts.watch.post(event);
+        });
       });
     });
   });
@@ -516,7 +522,9 @@ function watchVendor() {
     config.client.vendors.watch.pre(event);
     cleanVendor(() => {
       buildVendor(() => {
-        rebuildHtml(config.client.vendors.watch.post);
+        rebuildHtml(() => {
+          config.client.vendors.watch.post(event);
+        });
       });
     });
   });
@@ -590,7 +598,9 @@ function watchImages() {
     config.client.images.watch.pre(event);
     cleanImages(() => {
       buildImages(() => {
-        rebuildHtml(config.resources.images.watch.post);
+        rebuildHtml(() => {
+          config.resources.images.watch.post(event);
+        });
       });
     });
   });
@@ -778,7 +788,7 @@ function watchServerNodeModules() {
     config.server.node_modules.watch.pre(event);
     cleanNodeModules(() => {
       copyNodeModules(() => {
-        config.server.node_modules.watch.post(services);
+        config.server.node_modules.watch.post(event, services);
       });
     });
   });
@@ -801,7 +811,7 @@ function watchServerJs(includeMaps) {
     config.server.ts.watch.pre(event);
     cleanServerJs(() => {
       buildServerJs(() => {
-        config.server.ts.watch.post(services);
+        config.server.ts.watch.post(event, services);
       }, !!includeMaps);
     });
   });
