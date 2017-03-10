@@ -7,7 +7,7 @@ const noop = Function.prototype;
 module.exports = function(config) {
   const emptyConfig = {
     client: {
-      package: '',
+      node_modules: '',
       html: {
         entry: '',
         bundle: '',
@@ -52,7 +52,10 @@ module.exports = function(config) {
       }
     },
     server: {
-      package: '',
+      node_modules: {
+        from: '',
+        to: ''
+      },
       from: '',
       to: '',
       tsconfig: '',

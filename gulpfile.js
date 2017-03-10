@@ -103,6 +103,7 @@ function removeEmptyDirectory(current, root) {
   removeEmptyDirectory(path.dirname(current), root);
 }
 
+// TODO: Remove this.
 const paths = {
   env: '.env'
 };
@@ -117,46 +118,24 @@ if (config.client.vendors.manifest) {
 
 
 
-/**
- * npm install
- */
-
-/**
- * Install npm packages in given directory.
- * @param {string} pkg path to package.json
- * @param {Function} done
- */
-function npmInstall(pkg, done) {
-  done = done || noop;
-  if (!pkg) {
-    logSkip('npm-install');
-    return done();
-  }
-  timeClient(`npm-install ${pkg}`);
-  spawn('npm', ['install', '--only=production'], { cwd: path.dirname(pkg) }, (err) => {
-    timeEndClient(`npm-install ${pkg}`);
-    done(err);
-  });
-}
-
-function spawn(command, args, options, done) {
-  done = done || noop;
-  // Guard against accidentally invoking handler functions multiple times.
-  let alreadyDone = false;
-  const fork = child_process.spawn(command, args, options);
-  fork.stdout.on('data', (data) => process.stdout.write(data));
-  fork.stderr.on('data', (data) => process.stderr.write(data));
-  fork.on('error', (err) => {
-    if (alreadyDone) return;
-    alreadyDone = true;
-    done(err);
-  });
-  fork.on('exit', () => {
-    if (alreadyDone) return;
-    alreadyDone = true;
-    done();
-  });
-}
+// function spawn(command, args, options, done) {
+//   done = done || noop;
+//   // Guard against accidentally invoking handler functions multiple times.
+//   let alreadyDone = false;
+//   const fork = child_process.spawn(command, args, options);
+//   fork.stdout.on('data', (data) => process.stdout.write(data));
+//   fork.stderr.on('data', (data) => process.stderr.write(data));
+//   fork.on('error', (err) => {
+//     if (alreadyDone) return;
+//     alreadyDone = true;
+//     done(err);
+//   });
+//   fork.on('exit', () => {
+//     if (alreadyDone) return;
+//     alreadyDone = true;
+//     done();
+//   });
+// }
 
 
 /**
@@ -474,8 +453,8 @@ function buildVendor(done) {
   vendors.forEach((vendor) => {
     // b.require(vendor);// For testing vendor-loading failures.
     // Vendor modules must be required relative to src directory.
-    b.require(`./node_modules/${vendor}`, {
-      basedir: path.dirname(config.client.package),
+    b.require(`./${vendor}`, {
+      basedir: config.client.node_modules,
       expose: vendor
     });
   });
@@ -674,22 +653,30 @@ function rebuildClient(done) {
 
 
 /**
- * Copy server package.json to build directory.
+ * Copy server node_modules to build directory.
  */
-function copyPackage(done) {
+function copyNodeModules(done) {
  done = done || noop;
- if (!config.server.package) {
-   logSkip('server package.json');
+ let skip = false;
+ if (!config.server.node_modules.from) {
+   console.log('undefined: config.server.node_modules.from');
+   skip = true;
+ }
+ if (!config.server.node_modules.to) {
+   console.log('undefined: config.server.node_modules.to');
+   skip = true;
+ }
+ if (skip) {
+   logSkip('server node_modules');
    return done();
  }
- timeServer('copy-package');
- const to = `${internalConfig.build}/${path.relative(internalConfig.src, config.server.package)}`;
- fsExtra.copy(config.server.package, to, (err) => {
+ timeServer('copy-node-modules');
+ fsExtra.copy(config.server.node_modules.from, config.server.node_modules.to, (err) => {
    if (err) {
      console.error(err);
      return done(err);
    }
-   timeEndServer('copy-package');
+   timeEndServer('copy-node-modules');
    done();
  });
 }
@@ -757,7 +744,7 @@ function buildServer(done, includeMaps) {
   logServer('building...');
   timeServer('build');
   async.parallel([
-    copyPackage,
+    copyNodeModules,
     (then) => buildServerJs(then, includeMaps)
   ], () => {
     timeEndServer('build');
@@ -849,20 +836,11 @@ function cleanGitCommit(done) {
 function build(done, includeMaps) {
   done = done || noop;
   if (includeMaps) console.log('building with sourcemaps');
-  // Install packages in project directory.
-  // Type support in IDEs assumes packages are installed alongside source code.
-  npmInstall(config.client.package, (err) => {
-    if (err) return done(err);
-    npmInstall(config.server.package, (err) => {
-      if (err) return done(err);
-      // Build, finally
-      async.parallel([
-        buildClient,
-        (then) => buildServer(then, !!includeMaps),
-        writeGitCommit
-      ], done);
-    });
-  });
+  async.parallel([
+    buildClient,
+    (then) => buildServer(then, !!includeMaps),
+    writeGitCommit
+  ], done);
 }
 
 function clean(done) {
