@@ -446,7 +446,6 @@ function buildVendor(done) {
   const b = browserify({ debug: true });
 
   vendors.forEach((vendor) => {
-    // b.require(vendor);// For testing vendor-loading failures.
     // Vendor modules must be required relative to src directory.
     b.require(`./${vendor}`, {
       basedir: config.client.node_modules,
@@ -454,8 +453,15 @@ function buildVendor(done) {
     });
   });
 
+  // Only call callback once.
+  let failed = false;
   return b.bundle()
-  .on('error', console.error)
+  .on('error', (err) => {
+    console.error(err);
+    if (failed) return;
+    failed = true;
+    done(new Error('Failed buildVendor'));
+  })
   .pipe(source(config.client.vendors.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
@@ -464,6 +470,7 @@ function buildVendor(done) {
   .pipe(sourcemaps.write('.'))
   .pipe(gulp.dest('/'))
   .on('finish', () => {
+    if (failed) return;
     timeEndClient('vendor build');
     done();
   });
@@ -600,8 +607,10 @@ function buildClient(done) {
     buildJs,
     buildVendor,
     buildImages
-  ], () => {
-    buildHtml(() => {
+  ], (err) => {
+    if (err) return done(err);
+    buildHtml((err) => {
+      if (err) return done(err);
       timeEndClient('build');
       done();
     });
@@ -896,7 +905,13 @@ gulp.task('clean', (done) => {
 
 // If we use gulp subtasks, the time report for this task is not useful.
 gulp.task('build', ['clean'], (done) => {
-  build(done);
+  build((err) => {
+    if (err) {
+      console.error('BUILD ERROR:', err);
+      return process.exit(1);
+    }
+    done();
+  });
 });
 
 gulp.task('watch', ['clean'], (done) => {
