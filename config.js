@@ -1,51 +1,106 @@
 const deepExtend = require('deep-extend');
 const path = require('path');
+const noop = Function.prototype;
 
-module.exports = function() {
+// All paths are relative to this container,
+// even if defined within config file.
+module.exports = function(config) {
   const emptyConfig = {
     client: {
       html: {
         entry: '',
         bundle: '',
-        watch: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        },
         inject: {}
       },
       scss: {
         entry: '',
         bundle: '',
-        watch: ''
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
       },
       ts: {
         entry: '',
         bundle: '',
-        watch: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        },
         tsconfig: ''
       },
       vendors: {
         manifest: '',
-        bundle: ''
+        bundle: '',
+        // Let all packages through.
+        test: (vendor) => true,
+        watch: {
+          // glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
       }
     },
     server: {
-      from: '',
-      to: '',
-      tsconfig: ''
+      node_modules: {
+        from: '',
+        to: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
+      },
+      ts: {
+        from: '',
+        to: '',
+        tsconfig: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
+      },
+      watch: {
+        init: noop
+      }
     },
     resources: {
       images: {
         from: '',
         to: '',
-        manifest: ''
+        manifest: '',
+        watch: {
+          // glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        },
       }
     },
+    services: {},
     gitCommit: ''
   };
 
   let customConfig;
   try {
-    customConfig = require(path.join(process.cwd(), 'fullstack.conf'))();
+    // TODO: Make config file path configurable.
+    customConfig = require(path.join(config.src, 'fullstack.config'))(config);
   } catch (e) {
-    console.warn('No config file found');
+    console.warn('Config file not found or invalid', e);
     customConfig = {};
   }
 

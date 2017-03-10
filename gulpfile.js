@@ -1,27 +1,21 @@
-// Project directory is one level below this file.
-const assert = require('assert');
-const path = require('path');
-assert.equal(path.dirname(process.cwd()), __dirname);
-
 // Module require() is relative to current working directory.
 // Local require(./[...]) is relative to __dirname and cannot be used to access
 // project files.
 const addSrc = require('gulp-add-src');
 const async = require('async');
 const autoprefixer = require('gulp-autoprefixer');
-const browserSync = require('browser-sync');
 const browserify = require('browserify-incremental');
 const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
-const dotenv = require('dotenv');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const gulp = require('gulp');
 const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
-const jsonfile = require('jsonfile');
+const livereload = require('gulp-livereload');
+const path = require('path');
 const rename = require('gulp-rename');
 const rev = require('gulp-rev');
 const revReplace = require('gulp-rev-replace');
@@ -29,13 +23,32 @@ const rimraf = require('rimraf');
 const sass = require('gulp-sass');
 const source = require('vinyl-source-stream');
 const sourcemaps = require('gulp-sourcemaps');
-const tcp = require('tcp-port-used');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 
-const config = require('./config')();
+// Absolute paths
+const internalConfig = {
+  src: '/src',
+  build: '/build'
+};
+
+// Provide copy of internal config
+const config = require('./config')({
+  src: internalConfig.src,
+  build: internalConfig.build
+});
 const noop = Function.prototype;
+
+const DockerServiceFactory = require('./docker-service');
+
+// Create a DockerService instance for each key in config.services object.
+// DockerService instance are exposed to the project configuration module.
+const services = {};
+Object.keys(config.services).forEach((key) => {
+  console.log(`Creating service: ${key}`);
+  services[key] = DockerServiceFactory(config.services[key]);
+});
 
 /**
  * file.css -> file-*.css?(.map)
@@ -54,14 +67,14 @@ function hashGlob(filepath) {
  */
 function removePath(entity, done) {
   done = done || noop;
-  // If you need to go to parent of working directory to get to entity, then
-  // entity is not inside working directory. This check also works on globs.
-  if (path.relative(process.cwd(), entity).slice(0,2) === '..') {
-    throw new Error('entity must live inside working directory');
+  // If you need to go to parent of build directory to get to entity, then
+  // entity is not inside build directory. This check also works on globs.
+  if (path.relative(internalConfig.build, entity).slice(0,2) === '..') {
+    throw new Error('entity must live inside build directory');
   }
   rimraf(entity, () => {
-    // Remove empty directories until working directory is reached.
-    removeEmptyDirectory(path.dirname(entity), process.cwd());
+    // Remove empty directories until build  directory is reached.
+    removeEmptyDirectory(path.dirname(entity), internalConfig.build);
     done();
   });
 }
@@ -89,18 +102,26 @@ function removeEmptyDirectory(current, root) {
   removeEmptyDirectory(path.dirname(current), root);
 }
 
-const paths = {
-  env: '.env'
-};
 
-// Read vendors manifest if there is one.
-let vendors;
-if (config.client.vendors.manifest) {
-  vendors = jsonfile.readFileSync(`./${config.client.vendors.manifest}`, { throws: false });
-} else {
-  vendors = [];
-}
 
+// function spawn(command, args, options, done) {
+//   done = done || noop;
+//   // Guard against accidentally invoking handler functions multiple times.
+//   let alreadyDone = false;
+//   const fork = child_process.spawn(command, args, options);
+//   fork.stdout.on('data', (data) => process.stdout.write(data));
+//   fork.stderr.on('data', (data) => process.stderr.write(data));
+//   fork.on('error', (err) => {
+//     if (alreadyDone) return;
+//     alreadyDone = true;
+//     done(err);
+//   });
+//   fork.on('exit', () => {
+//     if (alreadyDone) return;
+//     alreadyDone = true;
+//     done();
+//   });
+// }
 
 
 /**
@@ -138,11 +159,12 @@ function buildHtml(done) {
   .pipe(revReplace({
     manifest: gulp.src(config.resources.images.manifest)
   }))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('html build');
     done();
-  });
+  })
+  .pipe(livereload());
 }
 
 /**
@@ -173,18 +195,21 @@ function rebuildHtml(done) {
 
 /**
  * Rebuild index.html whenever any html file changes.
- * @param  {Function} callback called after index.html is written to disk
+ * Callback called after index.html is written to disk.
  */
-function watchHtml(callback) {
-  callback = callback || noop;
-  if (!config.client.html.watch) {
+function watchHtml() {
+  if (!config.client.html.watch.glob) {
     return;
   }
   logClient('watching html');
-  gulp.watch(config.client.html.watch, (event) => {
+  gulp.watch(config.client.html.watch.glob, (event) => {
     logClientWatchEvent(event);
-    rebuildHtml(callback);
+    config.client.html.watch.pre(event);
+    rebuildHtml(() => {
+      config.client.html.watch.post(event);
+    });
   });
+  config.client.html.watch.init();
 }
 
 
@@ -216,7 +241,7 @@ function buildCss(done) {
   .pipe(rename(config.client.scss.bundle))
   .pipe(rev())
   .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     done();
     timeEndClient('css build');
@@ -242,22 +267,25 @@ function cleanCss(done) {
 /**
  * Rebuild index.css and its sourcemap whenever any scss file changes.
  * Rebuild index.html to update index.css hash.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchCss(callback) {
-  callback = callback || noop;
-  if (!config.client.scss.watch) {
+function watchCss() {
+  if (!config.client.scss.watch.glob) {
     return;
   }
   logClient('watching css');
-  gulp.watch(config.client.scss.watch, (event) => {
+  gulp.watch(config.client.scss.watch.glob, (event) => {
     logClientWatchEvent(event);
+    config.client.scss.watch.pre(event);
     cleanCss(() => {
       buildCss(() => {
-        rebuildHtml(callback);
+        rebuildHtml(() => {
+          config.client.scss.watch.post(event);
+        });
       });
     });
   });
+  config.client.scss.watch.init();
 }
 
 
@@ -302,7 +330,7 @@ function bundleJs(done) {
   .pipe(uglify())
   .pipe(rev())
   .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', function() {
     done();
   });
@@ -336,7 +364,8 @@ function buildJs(done) {
   // transpile TypeScript
   jsBundle.plugin(tsify, { project: config.client.ts.tsconfig });
 
-  vendors.forEach((vendor) => {
+  forEachVendor((vendor) => {
+    console.log(`Excluding from main bundle: ${vendor}`);
     jsBundle.external(vendor);
   });
 
@@ -350,24 +379,27 @@ function buildJs(done) {
  * Rebuild index.js and its sourcemap whenever any typescript file changes.
  * Rebuild index.html to update index.js hash.
  * NOTE: buildJs must be called at least once before this.
- * @param  {Function} callback called after bundle is written to disk
+ * Callback called after bundle is written to disk.
  */
-function watchJs(callback) {
-  callback = callback || noop;
-  if (!config.client.ts.watch) {
+function watchJs() {
+  if (!config.client.ts.watch.glob) {
     return;
   }
   logClient('watching js');
-  gulp.watch(config.client.ts.watch, (event) => {
+  gulp.watch(config.client.ts.watch.glob, (event) => {
     logClientWatchEvent(event);
+    config.client.ts.watch.pre(event);
     cleanJs(() => {
       timeClient('js build (incremental)');
       bundleJs(() => {
         timeEndClient('js build (incremental)');
-        rebuildHtml(callback);
+        rebuildHtml(() => {
+          config.client.ts.watch.post(event);
+        });
       });
     });
   });
+  config.client.ts.watch.init();
 }
 
 /**
@@ -395,6 +427,22 @@ function cleanJs(done) {
 
 
 /**
+ * Call callback for each vendor that passes the test.
+ * @param {Function} callback
+ */
+function forEachVendor(callback) {
+  const pkg = require(config.client.vendors.manifest);
+  Object.keys(pkg.dependencies).forEach((vendor) => {
+    if (!config.client.vendors.test(vendor)) {
+      return;
+    }
+    callback(vendor);
+  });
+}
+
+
+
+/**
  * Generate vendor js file and its sourcemap.
  * @return {stream} browserifyBundleStream
  */
@@ -402,7 +450,7 @@ function buildVendor(done) {
   done = done || noop;
   if (!(
     config.client.vendors.bundle &&
-    config.client.vendors.manifest //vendors
+    config.client.vendors.manifest //package.json
   )) {
     logSkip('vendor');
     return done();
@@ -411,20 +459,33 @@ function buildVendor(done) {
 
   const b = browserify({ debug: true });
 
-  vendors.forEach((vendor) => {
-    b.require(vendor);
+  forEachVendor((vendor) => {
+    console.log(`Adding to vendor bundle: ${vendor}`);
+    // QUESTION: Can we assume node_modules will be installed next to manifest?
+    b.require(`./node_modules/${vendor}`, {
+      basedir: path.dirname(config.client.vendors.manifest),
+      expose: vendor
+    });
   });
 
+  // Only call callback once.
+  let failed = false;
   return b.bundle()
-  .on('error', console.error)
+  .on('error', (err) => {
+    console.error(err);
+    if (failed) return;
+    failed = true;
+    done(new Error('Failed buildVendor'));
+  })
   .pipe(source(config.client.vendors.bundle))
   .pipe(buffer())
   .pipe(sourcemaps.init({ loadMaps: true }))
   .pipe(uglify())
   .pipe(rev())
   .pipe(sourcemaps.write('.'))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
+    if (failed) return;
     timeEndClient('vendor build');
     done();
   });
@@ -447,24 +508,27 @@ function cleanVendor(done) {
 }
 
 /**
- * Rebuild vendor bundle and its sourcemap whenever vendors.json changes.
+ * Rebuild vendor bundle and its sourcemap whenever client package.json changes.
  * Rebuild index.html to update file hash.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchVendor(callback) {
-  callback = callback || noop;
+function watchVendor() {
   if (!config.client.vendors.manifest) {
     return;
   }
   logClient('watching vendor');
   gulp.watch(config.client.vendors.manifest, (event) => {
     logClientWatchEvent(event);
+    config.client.vendors.watch.pre(event);
     cleanVendor(() => {
       buildVendor(() => {
-        rebuildHtml(callback);
+        rebuildHtml(() => {
+          config.client.vendors.watch.post(event);
+        });
       });
     });
   });
+  config.client.vendors.watch.init();
 }
 
 
@@ -495,7 +559,7 @@ function buildImages(done) {
   .pipe(rev())
   .pipe(gulp.dest(config.resources.images.to))
   .pipe(rev.manifest(config.resources.images.manifest))
-  .pipe(gulp.dest('.'))
+  .pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('images build');
     done();
@@ -522,22 +586,25 @@ function cleanImages(done) {
 /**
  * Rebuild images whenever images change.
  * Rebuild index.html to update file hashes.
- * @param  {Function} callback called after files are written to disk
+ * Callback called after files are written to disk.
  */
-function watchImages(callback) {
-  callback = callback || noop;
+function watchImages() {
   if (!config.resources.images.from) {
     return;
   }
   logClient('watching images');
   gulp.watch(path.join(config.resources.images.from, '**/*'), (event) => {
     logClientWatchEvent(event);
+    config.client.images.watch.pre(event);
     cleanImages(() => {
       buildImages(() => {
-        rebuildHtml(callback);
+        rebuildHtml(() => {
+          config.resources.images.watch.post(event);
+        });
       });
     });
   });
+  config.resources.images.watch.init();
 }
 
 
@@ -559,8 +626,10 @@ function buildClient(done) {
     buildJs,
     buildVendor,
     buildImages
-  ], () => {
-    buildHtml(() => {
+  ], (err) => {
+    if (err) return done(err);
+    buildHtml((err) => {
+      if (err) return done(err);
       timeEndClient('build');
       done();
     });
@@ -569,15 +638,14 @@ function buildClient(done) {
 
 /**
  * Watch each build cycle independently.
- * @param  {Function} callback passed to each client watch function
  */
-function watchClient(callback) {
-  callback = callback || noop;
-  watchCss(callback);
-  watchJs(callback);
-  watchVendor(callback);
-  watchImages(callback);
-  watchHtml(callback);
+function watchClient() {
+  livereload.listen();
+  watchCss();
+  watchJs();
+  watchVendor();
+  watchImages();
+  watchHtml();
 }
 
 /**
@@ -595,52 +663,70 @@ function cleanClient(done) {
   ], done);
 }
 
+
+
 /**
- * Shortcut to clean and build client files.
- * @param  {Function} done called once client files are written to disk
+ * Copy server node_modules to build directory.
  */
-function rebuildClient(done) {
-  cleanClient(() => {
-    buildClient(done);
-  });
+function copyNodeModules(done) {
+ done = done || noop;
+ let skip = false;
+ if (!config.server.node_modules.from) {
+   console.log('undefined: config.server.node_modules.from');
+   skip = true;
+ }
+ if (!config.server.node_modules.to) {
+   console.log('undefined: config.server.node_modules.to');
+   skip = true;
+ }
+ if (skip) {
+   logSkip('server node_modules');
+   return done();
+ }
+ timeServer('copy-node-modules');
+ fsExtra.copy(config.server.node_modules.from, config.server.node_modules.to, (err) => {
+   if (err) {
+     console.error(err);
+     return done(err);
+   }
+   timeEndServer('copy-node-modules');
+   done();
+ });
 }
 
-
-
 /**
- * Server
+ * Server JavaScript
  */
 
-
 let serverTypescript;
-if (config.server.tsconfig) {
-  serverTypescript = typescript.createProject(config.server.tsconfig);
+if (config.server.ts.tsconfig) {
+  serverTypescript = typescript.createProject(config.server.ts.tsconfig);
 } else {
   serverTypescript = null;
 }
 
 /**
- * Build server files.
+ * Build server typescript files.
  * @param {Function} done called after files are written to disk
  * @param {boolean} includeMaps indicates whether or not to include sourcemaps
  * @return {stream}
  */
-function buildServer(done, includeMaps) {
+function buildServerJs(done, includeMaps) {
   done = done || noop;
   if (!(
-    config.server.from &&
-    config.server.to
+    config.server.ts.from &&
+    config.server.ts.to
   )) {
-    logSkip('server');
+    logSkip('server js');
     return done();
   }
 
-  logServer('building...');
-  timeServer('build');
+  timeServer('js build');
 
-  var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
+  var stream = gulp.src(path.join(config.server.ts.from, '**/!(*.spec).ts'));
 
   if (includeMaps) {
+    console.log('building server js with sourcemaps');
     stream = stream.pipe(sourcemaps.init());
   }
 
@@ -651,29 +737,114 @@ function buildServer(done, includeMaps) {
   }
 
   return stream
-  .pipe(addSrc(path.join(config.server.from, '**/*.html')))
-  .pipe(gulp.dest(config.server.to))
+  // TODO: separate build/watch/clean tasks for server html
+  .pipe(addSrc(path.join(config.server.ts.from, '**/*.html')))
+  .pipe(gulp.dest(config.server.ts.to))
   .on('finish', () => {
+    timeEndServer('js build');
+    done();
+  });
+}
+
+
+
+/**
+ * Build server files.
+ * @param {Function} done called after all server files are written to disk
+ */
+function buildServer(done, includeMaps) {
+  if (includeMaps) console.log('building server with sourcemaps');
+  done = done || noop;
+  logServer('building...');
+  timeServer('build');
+  async.parallel([
+    copyNodeModules,
+    (then) => buildServerJs(then, includeMaps)
+  ], () => {
     timeEndServer('build');
     done();
   });
 }
 
+
+
 /**
- * Watch server files.
- * Rebuild server files with sourcemaps.
- * @param  {Function} callback called whenever a server file changes
- * @param {boolean} includeMaps indicates whether or not to include sourcemaps
+ * Watch each build cycle independently.
  */
-function watchServer(callback, includeMaps) {
-  callback = callback || noop;
-  if (!config.server.from) {
+function watchServer(includeMaps) {
+  watchServerNodeModules();
+  watchServerJs(includeMaps);
+  config.server.watch.init(services);
+}
+
+
+function watchServerNodeModules() {
+  if (!config.server.node_modules.watch.glob) {
     return;
   }
-  logServer('watching all files');
-  gulp.watch(path.join(config.server.from, '**/*'), (event) => {
+  logServer('watching server node_modules');
+  gulp.watch(config.server.node_modules.watch.glob, (event) => {
     logServerWatchEvent(event);
-    rebuildServer(callback, !!includeMaps);
+    config.server.node_modules.watch.pre(event);
+    cleanNodeModules(() => {
+      copyNodeModules(() => {
+        config.server.node_modules.watch.post(event, services);
+      });
+    });
+  });
+  config.server.node_modules.watch.init(services);
+}
+
+/**
+ * Watch server typescript files.
+ * Rebuild server typescript files with sourcemaps.
+ * Callback called whenever a server file changes.
+ * @param {boolean} includeMaps indicates whether or not to include sourcemaps
+ */
+function watchServerJs(includeMaps) {
+  if (!config.server.ts.from) {
+    return;
+  }
+  logServer('watching server js');
+  gulp.watch(path.join(config.server.ts.from, '**/*'), (event) => {
+    logServerWatchEvent(event);
+    config.server.ts.watch.pre(event);
+    cleanServerJs(() => {
+      buildServerJs(() => {
+        config.server.ts.watch.post(event, services);
+      }, !!includeMaps);
+    });
+  });
+  config.server.ts.watch.init(services);
+}
+
+function cleanNodeModules(done) {
+  done = done || noop;
+  if (!config.server.node_modules.to) {
+    logSkip('server node_modules clean');
+    return done();
+  }
+  timeServer('node_modules clean');
+  removePath(config.server.node_modules.to, () => {
+    timeEndServer('node_modules clean');
+    done();
+  });
+}
+
+/**
+ * Clean server js files.
+ * @param {Function} done
+ */
+function cleanServerJs(done) {
+  done = done || noop;
+  if (!config.server.ts.to) {
+    logSkip('server js clean');
+    return done();
+  }
+  timeServer('js clean');
+  removePath(config.server.ts.to, () => {
+    timeEndServer('js clean');
+    done();
   });
 }
 
@@ -683,22 +854,10 @@ function watchServer(callback, includeMaps) {
  */
 function cleanServer(done) {
   done = done || noop;
-  if (!config.server.to) {
-    logSkip('server-clean');
-    return done();
-  }
-  removePath(config.server.to, done);
-}
-
-/**
- * Shortcut to clean and build server files.
- * @param  {Function} done called once server files are written to disk
- * @param {boolean} includeMaps indicates whether or not to include sourcemaps
- */
-function rebuildServer(done, includeMaps) {
-  cleanServer(() => {
-    buildServer(done, !!includeMaps);
-  });
+  async.parallel([
+    cleanServerJs,
+    cleanNodeModules
+  ], done);
 }
 
 
@@ -713,7 +872,7 @@ function writeGitCommit(done) {
     logSkip('gitCommit');
     return done();
   }
-  const commit = child_process.execSync('git rev-parse HEAD');
+  const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
   fsExtra.outputFile(config.gitCommit, commit, (err) => {
     if (err) console.log(err);
     done();
@@ -737,6 +896,7 @@ function cleanGitCommit(done) {
 
 function build(done, includeMaps) {
   done = done || noop;
+  if (includeMaps) console.log('building with sourcemaps');
   async.parallel([
     buildClient,
     (then) => buildServer(then, !!includeMaps),
@@ -753,9 +913,9 @@ function clean(done) {
   ], done);
 }
 
-function watch(callback, includeMaps) {
-  watchClient(callback);
-  watchServer(callback, !!includeMaps);
+function watch(includeMaps) {
+  watchClient();
+  watchServer(!!includeMaps);
 }
 
 gulp.task('clean', (done) => {
@@ -764,157 +924,21 @@ gulp.task('clean', (done) => {
 
 // If we use gulp subtasks, the time report for this task is not useful.
 gulp.task('build', ['clean'], (done) => {
-  build(done);
+  build((err) => {
+    if (err) {
+      console.error('BUILD ERROR:', err);
+      return process.exit(1);
+    }
+    done();
+  });
 });
 
 gulp.task('watch', ['clean'], (done) => {
   build(() => {
-    watch();
+    watch(true);
     done();
-  });
+  }, true);
 });
-
-
-
-/**
- * Dev
- */
-
-
-
-/**
- * Proxy server state
- */
-const proxy = {
-  server: null,
-  target: null,
-  host: null,
-  port: null
-};
-
-/**
- * Launch or reload proxy server once app server is ready.
- * @param {Function} done called proxy server reloads or initializes
- */
-function launchProxyServer(done) {
-  done = done || noop;
-  const targetIp = process.env.IP || '0.0.0.0';
-  const targetPort = parseInt(process.env.PORT) || 9000;
-  const target = `http://${targetIp}:${targetPort}`;
-  const host = process.env.DEV_HOST || 'local';
-  const port = process.env.DEV_PORT || '7000';
-  const proxyServerName = 'proxy';
-  tcp.waitUntilUsedOnHost(targetPort, targetIp, 100, 1000000)
-  .then(() => {
-    // If browser-sync configuration is still valid, reload.
-    // Otherwise, create new browser-sync server.
-    if (proxy.server) {
-      if (proxy.target === target && proxy.host === host && proxy.port === port) {
-        proxy.server.reload();
-        return done();
-      } else {
-        proxy.server.exit();
-      }
-    }
-
-    // update state
-    proxy.server = browserSync.create(proxyServerName);
-    proxy.server.init({
-      proxy: target,
-      browser: 'google chrome',
-      open: host,
-      port: port
-    }, done);
-    proxy.target = target;
-    proxy.host = host;
-    proxy.port = port;
-  })
-  .catch((err) => {
-    console.error(err.message);
-  });
-}
-
-
-
-var busy = false;
-/**
- * Launch or restart app server.
- * @param {Function} done called after child process spawns
- * @param {boolean} debug activates node debug mode
- */
-function launchServer(done, debug) {
-  if (busy) {
-    return;
-  }
-
-  // Stay busy until child process exits.
-  busy = true;
-
-  done = done || noop;
-
-  // TODO: if debug is true, use flags --debug --debug-brk when running app
-
-  // Build and run app.
-  const dockerCompose = child_process.spawn('docker-compose', ['up', '-d', '--build', '-t', '0', 'app']);
-  dockerCompose.stdout.on('data', (data) => process.stdout.write(data));
-  dockerCompose.stderr.on('data', (data) => process.stdout.write(data));
-  dockerCompose.on('exit', (code) => {
-    busy = false;
-    done();
-  });
-}
-
-
-
-/**
- * Build and serve app.
- * @param {Function} done called after servers have launched
- * @param {boolean} debug activates node debug mode and sourcemaps
- */
-function serve(done, debug) {
-  done = done || noop;
-  debug = !!debug;
-  build(() => {
-    launchServer(() => {
-      launchProxyServer(done);
-    }, debug);
-  }, debug);
-}
-
-/**
- * Serve app and watch files for changes.
- * @param {Function} done called after servers have launched
- * @param {boolean} debug activates node debug mode and sourcemaps
- */
-function dev(done, debug) {
-  done = done || noop;
-  debug = !!debug;
-
-  // load environment variables into process.env
-  dotenv.config({ path: paths.env });
-
-  serve(() => {
-    gulp.watch([paths.env], (event) => {
-      logEnvironmentWatchEvent(event);
-      serve();
-    });
-    watchClient(() => {
-      launchProxyServer();
-    });
-    watchServer(() => {
-      launchServer(launchProxyServer, debug);
-    }, debug);
-    done();
-  }, debug);
-}
-
-gulp.task('dev', ['clean'], (done) => {
-  dev(done, false);
-});
-
-gulp.task('dev:debug', ['clean'], (done) => {
-  dev(done, true);
-})
 
 
 
@@ -964,17 +988,7 @@ function timeEndServer(key) {
   console.timeEnd(`${serverLogPrefix} ${key}`);
 }
 
-// Environment
-
-const environmentLogPrefix = chalk.green('[env]');
-
-function logEnvironment(message) {
-  console.log(environmentLogPrefix, message);
-}
-
-function logEnvironmentWatchEvent(event) {
-  logEnvironment(`${event.path} ${event.type}`);
-}
+// Skip
 
 function logSkip(task) {
   console.log(`Skipping [${task}]`);
