@@ -872,6 +872,7 @@ function writeGitCommit(done) {
     logSkip('gitCommit');
     return done();
   }
+  console.log(`Writing latest git commit to ${config.gitCommit}`);
   const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
   fsExtra.outputFile(config.gitCommit, commit, (err) => {
     if (err) console.log(err);
