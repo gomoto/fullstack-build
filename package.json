@@ -1,6 +1,10 @@
 {
   "name": "fullstack-build",
   "version": "0.0.0",
+  "scripts": {
+    "version": "git add -A",
+    "postversion": "git push origin head && git push --tags"
+  },
   "devDependencies": {
     "async": "2.1.5",
     "browserify": "13.3.0",
