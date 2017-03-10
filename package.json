@@ -24,7 +24,6 @@
     "html-injector": "^4.0.2",
     "html-minifier": "^3.2.2",
     "html-minifier-stream": "0.1.0",
-    "jsonfile": "^2.4.0",
     "rimraf": "^2.6.1",
     "tsify": "^2.0.2",
     "typescript": "^2.0.9",

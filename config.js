@@ -7,7 +7,6 @@ const noop = Function.prototype;
 module.exports = function(config) {
   const emptyConfig = {
     client: {
-      node_modules: '',
       html: {
         entry: '',
         bundle: '',
@@ -43,6 +42,8 @@ module.exports = function(config) {
       vendors: {
         manifest: '',
         bundle: '',
+        // Let all packages through.
+        test: (vendor) => true,
         watch: {
           // glob: '',
           init: noop,

@@ -14,7 +14,6 @@ const gulp = require('gulp');
 const htmlInjector = require('html-injector');
 const htmlMinifierStream = require('html-minifier-stream');
 const imagemin = require('gulp-imagemin');
-const jsonfile = require('jsonfile');
 const livereload = require('gulp-livereload');
 const path = require('path');
 const rename = require('gulp-rename');
@@ -101,14 +100,6 @@ function removeEmptyDirectory(current, root) {
   fs.rmdirSync(current);
   // Remove empty parent directory.
   removeEmptyDirectory(path.dirname(current), root);
-}
-
-// Read vendors manifest if there is one.
-let vendors;
-if (config.client.vendors.manifest) {
-  vendors = jsonfile.readFileSync(`${config.client.vendors.manifest}`, { throws: false });
-} else {
-  vendors = [];
 }
 
 
@@ -369,7 +360,8 @@ function buildJs(done) {
   // transpile TypeScript
   jsBundle.plugin(tsify, { project: config.client.ts.tsconfig });
 
-  vendors.forEach((vendor) => {
+  forEachVendor((vendor) => {
+    console.log(`Excluding from main bundle: ${vendor}`);
     jsBundle.external(vendor);
   });
 
@@ -429,6 +421,22 @@ function cleanJs(done) {
 
 
 /**
+ * Call callback for each vendor that passes the test.
+ * @param {Function} callback
+ */
+function forEachVendor(callback) {
+  const pkg = require(config.client.vendors.manifest);
+  Object.keys(pkg.dependencies).forEach((vendor) => {
+    if (!config.client.vendors.test(vendor)) {
+      return;
+    }
+    callback(vendor);
+  });
+}
+
+
+
+/**
  * Generate vendor js file and its sourcemap.
  * @return {stream} browserifyBundleStream
  */
@@ -436,7 +444,7 @@ function buildVendor(done) {
   done = done || noop;
   if (!(
     config.client.vendors.bundle &&
-    config.client.vendors.manifest //vendors
+    config.client.vendors.manifest //package.json
   )) {
     logSkip('vendor');
     return done();
@@ -445,10 +453,11 @@ function buildVendor(done) {
 
   const b = browserify({ debug: true });
 
-  vendors.forEach((vendor) => {
-    // Vendor modules must be required relative to src directory.
-    b.require(`./${vendor}`, {
-      basedir: config.client.node_modules,
+  forEachVendor((vendor) => {
+    console.log(`Adding to vendor bundle: ${vendor}`);
+    // QUESTION: Can we assume node_modules will be installed next to manifest?
+    b.require(`./node_modules/${vendor}`, {
+      basedir: path.dirname(config.client.vendors.manifest),
       expose: vendor
     });
   });
@@ -493,7 +502,7 @@ function cleanVendor(done) {
 }
 
 /**
- * Rebuild vendor bundle and its sourcemap whenever vendors.json changes.
+ * Rebuild vendor bundle and its sourcemap whenever client package.json changes.
  * Rebuild index.html to update file hash.
  * Callback called after files are written to disk.
  */
