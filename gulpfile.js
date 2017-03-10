@@ -8,6 +8,7 @@ const browserify = require('browserify-incremental');
 const buffer = require('vinyl-buffer');
 const chalk = require('chalk');
 const child_process = require('child_process');
+const concat = require('gulp-concat');
 const fs = require('fs');
 const fsExtra = require('fs-extra');
 const gulp = require('gulp');
@@ -26,6 +27,7 @@ const sourcemaps = require('gulp-sourcemaps');
 const tsify = require('tsify');
 const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
+const wiredep = require('wiredep');
 
 // Absolute paths
 const internalConfig = {
@@ -493,7 +495,7 @@ function buildVendor(done) {
     timeEndClient('vendor build');
     done();
   });
-};
+}
 
 /**
  * Delete vendor bundle and its sourcemap.
@@ -534,6 +536,87 @@ function watchVendor() {
   });
   config.client.vendors.watch.init();
 }
+
+
+
+/**
+ * Bower Vendor
+ */
+
+
+
+/**
+ * Build bower vendor bundle.
+ */
+function buildBowerVendor(done) {
+  const taskName = 'bower-vendor-build';
+  done = done || noop;
+  if (!(
+    config.client.bower.bundle &&
+    config.client.bower.manifest &&
+    config.client.bower.components
+  )) {
+    logSkip(taskName);
+    return done();
+  }
+  timeClient(taskName);
+  const bowerDeps = wiredep({
+    directory: config.client.bower.components,
+    bowerJson: require(config.client.bower.manifest)
+  });
+  return gulp.src(bowerDeps.js)
+  .pipe(sourcemaps.init({ loadMaps: true }))
+  .pipe(concat(config.client.bower.bundle))
+  .pipe(uglify())
+  .pipe(rev())
+  .pipe(sourcemaps.write('.'))
+  .pipe(gulp.dest('/'))
+  .on('finish', () => {
+    done();
+    timeEndClient(taskName);
+  });
+}
+
+ /**
+  * Delete bower vendor bundle and its sourcemap.
+  */
+ function cleanBowerVendor(done) {
+   const taskName = 'bower-vendor-clean';
+   done = done || noop;
+   if (!config.client.bower.bundle) {
+     logSkip(taskName);
+     return done();
+   }
+   timeClient(taskName);
+   removePath(hashGlob(config.client.bower.bundle), () => {
+     timeEndClient(taskName);
+     done();
+   });
+ }
+
+ /**
+  * Rebuild bower vendor bundle and its sourcemap whenever something changes.
+  * Rebuild index.html to update file hash.
+  * Callback called after files are written to disk.
+  */
+ function watchBowerVendor() {
+   if (!config.client.bower.watch.glob) {
+     return;
+   }
+   logClient('watching vendor');
+   gulp.watch(config.client.bower.watch.glob, (event) => {
+     logClientWatchEvent(event);
+     config.client.bower.watch.pre(event);
+     cleanBowerVendor(() => {
+       buildBowerVendor(() => {
+         rebuildHtml(() => {
+           config.client.bower.watch.post(event);
+         });
+       });
+     });
+   });
+   config.client.bower.watch.init();
+ }
 
 
 
@@ -629,6 +712,7 @@ function buildClient(done) {
     buildCss,
     buildJs,
     buildVendor,
+    buildBowerVendor,
     buildImages
   ], (err) => {
     if (err) return done(err);
@@ -648,6 +732,7 @@ function watchClient() {
   watchCss();
   watchJs();
   watchVendor();
+  watchBowerVendor();
   watchImages();
   watchHtml();
 }
@@ -662,6 +747,7 @@ function cleanClient(done) {
     cleanCss,
     cleanJs,
     cleanVendor,
+    cleanBowerVendor,
     cleanImages,
     cleanHtml
   ], done);

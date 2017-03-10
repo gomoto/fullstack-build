@@ -50,6 +50,19 @@ module.exports = function(config) {
           pre: noop,
           post: noop
         }
+      },
+      // bower vendors
+      bower: {
+        // Unlike npm, bower_components does not need to be next to bower.json
+        components: '',
+        manifest: '',
+        bundle: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
       }
     },
     server: {
