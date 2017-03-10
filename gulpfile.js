@@ -103,11 +103,6 @@ function removeEmptyDirectory(current, root) {
   removeEmptyDirectory(path.dirname(current), root);
 }
 
-// TODO: Remove this.
-const paths = {
-  env: '.env'
-};
-
 // Read vendors manifest if there is one.
 let vendors;
 if (config.client.vendors.manifest) {
