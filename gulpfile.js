@@ -640,16 +640,6 @@ function cleanClient(done) {
   ], done);
 }
 
-/**
- * Shortcut to clean and build client files.
- * @param  {Function} done called once client files are written to disk
- */
-function rebuildClient(done) {
-  cleanClient(() => {
-    buildClient(done);
-  });
-}
-
 
 
 /**
