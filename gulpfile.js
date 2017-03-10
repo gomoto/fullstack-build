@@ -139,27 +139,31 @@ function buildHtml(done) {
 
   if (!(
     config.client.html.entry &&
-    config.client.html.bundle &&
-    config.client.html.inject &&
-    config.resources.images.manifest
+    config.client.html.bundle
   )) {
     logSkip('html');
     return done();
   }
 
   timeClient('html build');
-  fs.createReadStream(config.client.html.entry)
+
+  let htmlStream = fs.createReadStream(config.client.html.entry)
   .pipe(htmlInjector(config.client.html.inject))
   .pipe(htmlMinifierStream({
     collapseWhitespace: true,
     processScripts: ['text/ng-template']
   }))
   .pipe(source(config.client.html.bundle))
-  .pipe(buffer())
-  .pipe(revReplace({
-    manifest: gulp.src(config.resources.images.manifest)
-  }))
-  .pipe(gulp.dest('/'))
+  .pipe(buffer());
+
+  // Run rev-replace only if image manifest is defined.
+  if (config.resources.images.manifest) {
+    htmlStream = htmlStream.pipe(revReplace({
+      manifest: gulp.src(config.resources.images.manifest)
+    }));
+  }
+
+  htmlStream.pipe(gulp.dest('/'))
   .on('finish', () => {
     timeEndClient('html build');
     done();
