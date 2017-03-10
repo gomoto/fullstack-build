@@ -686,8 +686,8 @@ function copyNodeModules(done) {
  */
 
 let serverTypescript;
-if (config.server.tsconfig) {
-  serverTypescript = typescript.createProject(config.server.tsconfig);
+if (config.server.ts.tsconfig) {
+  serverTypescript = typescript.createProject(config.server.ts.tsconfig);
 } else {
   serverTypescript = null;
 }
@@ -701,8 +701,8 @@ if (config.server.tsconfig) {
 function buildServerJs(done, includeMaps) {
   done = done || noop;
   if (!(
-    config.server.from &&
-    config.server.to
+    config.server.ts.from &&
+    config.server.ts.to
   )) {
     logSkip('server js');
     return done();
@@ -710,7 +710,7 @@ function buildServerJs(done, includeMaps) {
 
   timeServer('js build');
 
-  var stream = gulp.src(path.join(config.server.from, '**/!(*.spec).ts'));
+  var stream = gulp.src(path.join(config.server.ts.from, '**/!(*.spec).ts'));
 
   if (includeMaps) {
     console.log('building server js with sourcemaps');
@@ -724,8 +724,9 @@ function buildServerJs(done, includeMaps) {
   }
 
   return stream
-  .pipe(addSrc(path.join(config.server.from, '**/*.html')))
-  .pipe(gulp.dest(config.server.to))
+  // TODO: separate build/watch/clean tasks for server html
+  .pipe(addSrc(path.join(config.server.ts.from, '**/*.html')))
+  .pipe(gulp.dest(config.server.ts.to))
   .on('finish', () => {
     timeEndServer('js build');
     done();
@@ -755,24 +756,83 @@ function buildServer(done, includeMaps) {
 
 
 /**
- * Watch server files.
- * Rebuild server files with sourcemaps.
+ * Watch each build cycle independently.
+ */
+function watchServer(includeMaps) {
+  watchServerNodeModules();
+  watchServerJs(includeMaps);
+  config.server.watch.init(services);
+}
+
+
+function watchServerNodeModules() {
+  if (!config.server.node_modules.watch.glob) {
+    return;
+  }
+  logServer('watching server node_modules');
+  gulp.watch(config.server.node_modules.watch.glob, (event) => {
+    logServerWatchEvent(event);
+    config.server.node_modules.watch.pre(event);
+    cleanNodeModules(() => {
+      copyNodeModules(() => {
+        config.server.node_modules.watch.post(services);
+      });
+    });
+  });
+  config.server.node_modules.watch.init(services);
+}
+
+/**
+ * Watch server typescript files.
+ * Rebuild server typescript files with sourcemaps.
  * Callback called whenever a server file changes.
  * @param {boolean} includeMaps indicates whether or not to include sourcemaps
  */
-function watchServer(includeMaps) {
-  if (!config.server.from) {
+function watchServerJs(includeMaps) {
+  if (!config.server.ts.from) {
     return;
   }
-  logServer('watching all files');
-  gulp.watch(path.join(config.server.from, '**/*'), (event) => {
+  logServer('watching server js');
+  gulp.watch(path.join(config.server.ts.from, '**/*'), (event) => {
     logServerWatchEvent(event);
-    config.server.watch.pre(event);
-    rebuildServer(() => {
-      config.server.watch.post(services);
-    }, !!includeMaps);
+    config.server.ts.watch.pre(event);
+    cleanServerJs(() => {
+      buildServerJs(() => {
+        config.server.ts.watch.post(services);
+      }, !!includeMaps);
+    });
   });
-  config.server.watch.init(services);
+  config.server.ts.watch.init(services);
+}
+
+function cleanNodeModules(done) {
+  done = done || noop;
+  if (!config.server.node_modules.to) {
+    logSkip('server node_modules clean');
+    return done();
+  }
+  timeServer('node_modules clean');
+  removePath(config.server.node_modules.to, () => {
+    timeEndServer('node_modules clean');
+    done();
+  });
+}
+
+/**
+ * Clean server js files.
+ * @param {Function} done
+ */
+function cleanServerJs(done) {
+  done = done || noop;
+  if (!config.server.ts.to) {
+    logSkip('server js clean');
+    return done();
+  }
+  timeServer('js clean');
+  removePath(config.server.ts.to, () => {
+    timeEndServer('js clean');
+    done();
+  });
 }
 
 /**
@@ -781,22 +841,10 @@ function watchServer(includeMaps) {
  */
 function cleanServer(done) {
   done = done || noop;
-  if (!config.server.to) {
-    logSkip('server-clean');
-    return done();
-  }
-  removePath(config.server.to, done);
-}
-
-/**
- * Shortcut to clean and build server files.
- * @param  {Function} done called once server files are written to disk
- * @param {boolean} includeMaps indicates whether or not to include sourcemaps
- */
-function rebuildServer(done, includeMaps) {
-  cleanServer(() => {
-    buildServer(done, !!includeMaps);
-  });
+  async.parallel([
+    cleanServerJs,
+    cleanNodeModules
+  ], done);
 }
 
 

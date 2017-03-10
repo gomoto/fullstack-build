@@ -54,16 +54,27 @@ module.exports = function(config) {
     server: {
       node_modules: {
         from: '',
-        to: ''
+        to: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
       },
-      from: '',
-      to: '',
-      tsconfig: '',
+      ts: {
+        from: '',
+        to: '',
+        tsconfig: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        }
+      },
       watch: {
-        // glob: '',
-        init: noop,
-        pre: noop,
-        post: noop
+        init: noop
       }
     },
     resources: {
