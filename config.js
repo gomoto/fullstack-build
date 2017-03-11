@@ -28,8 +28,21 @@ module.exports = function(config) {
           post: noop
         }
       },
+      // TypeScript modules
       ts: {
         entry: '',
+        bundle: '',
+        watch: {
+          glob: '',
+          init: noop,
+          pre: noop,
+          post: noop
+        },
+        tsconfig: ''
+      },
+      // TypeScript namespaces
+      cats: {
+        sources: [],
         bundle: '',
         watch: {
           glob: '',
@@ -113,6 +126,7 @@ module.exports = function(config) {
     // TODO: Make config file path configurable.
     customConfig = require(path.join(config.src, 'fullstack.config'))(config);
   } catch (e) {
+    // TODO: This should exit with non-zero code.
     console.warn('Config file not found or invalid', e);
     customConfig = {};
   }

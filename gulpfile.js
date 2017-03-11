@@ -297,7 +297,7 @@ function watchCss() {
 
 
 /**
- * JavaScript
+ * JavaScript (modules)
  */
 
 /**
@@ -352,6 +352,7 @@ function buildJs(done) {
   if (!(
     config.client.ts.entry &&
     config.client.ts.tsconfig &&
+    // TODO: Make this optional. Projects might not have a package.json
     config.client.vendors.manifest //vendors
   )) {
     logSkip('ts');
@@ -422,6 +423,94 @@ function cleanJs(done) {
     timeEndClient('js clean');
     done();
   });
+}
+
+
+
+/**
+ * JavaScript (namespaces)
+ */
+
+
+
+let clientTypescript;
+if (config.client.cats.tsconfig) {
+  clientTypescript = typescript.createProject(config.client.cats.tsconfig);
+} else {
+  clientTypescript = null;
+}
+
+/**
+ * Concatenate TypeScript files.
+ * Generate index.js and its sourcemap.
+ * @param  {Function} done called after files are written to disk
+ */
+function buildCats(done) {
+  const taskName = 'concat-ts-build';
+  done = done || noop;
+  if (!(
+    config.client.cats.sources.length > 0 &&
+    config.client.cats.bundle &&
+    config.client.cats.tsconfig
+  )) {
+    logSkip(taskName);
+    return done();
+  }
+  timeClient(taskName);
+  return gulp.src(config.client.cats.sources)
+  .pipe(sourcemaps.init())
+  .pipe(clientTypescript())
+  .pipe(concat(config.client.cats.bundle))
+  .pipe(uglify())
+  .pipe(rev())
+  .pipe(sourcemaps.write('.'))
+  .pipe(gulp.dest('/'))
+  .on('finish', () => {
+    timeEndClient(taskName);
+    done();
+  });
+}
+
+/**
+ * Delete index.js file and its sourcemap.
+ */
+function cleanCats(done) {
+  const taskName = 'concat-ts-clean';
+  done = done || noop;
+  if (!config.client.cats.bundle) {
+    logSkip(taskName);
+    return done();
+  }
+  timeClient(taskName);
+  removePath(hashGlob(config.client.cats.bundle), () => {
+    timeEndClient(taskName);
+    done();
+  });
+}
+
+/**
+ * Rebuild index.js and its sourcemap whenever any TypeScript file changes.
+ * Rebuild index.html to update index.js hash.
+ * Incremental builds happen because of gulp-typescript.
+ * Callback called after bundle is written to disk.
+ */
+function watchCats() {
+  if (!config.client.cats.watch.glob) {
+    return;
+  }
+  logClient('watching concat-ts');
+  gulp.watch(config.client.cats.watch.glob, (event) => {
+    logClientWatchEvent(event);
+    config.client.cats.watch.pre(event);
+    cleanCats(() => {
+      buildCats(() => {
+        rebuildHtml(() => {
+          config.client.cats.watch.post(event);
+        });
+      });
+    });
+  });
+  config.client.cats.watch.init();
 }
 
 
@@ -711,6 +800,7 @@ function buildClient(done) {
   async.parallel([
     buildCss,
     buildJs,
+    buildCats,
     buildVendor,
     buildBowerVendor,
     buildImages
@@ -731,6 +821,7 @@ function watchClient() {
   livereload.listen();
   watchCss();
   watchJs();
+  watchCats();
   watchVendor();
   watchBowerVendor();
   watchImages();
@@ -746,6 +837,7 @@ function cleanClient(done) {
   async.parallel([
     cleanCss,
     cleanJs,
+    cleanCats,
     cleanVendor,
     cleanBowerVendor,
     cleanImages,
