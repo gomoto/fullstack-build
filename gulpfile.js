@@ -351,9 +351,7 @@ function buildJs(done) {
   done = done || noop;
   if (!(
     config.client.ts.entry &&
-    config.client.ts.tsconfig &&
-    // TODO: Make this optional. Projects might not have a package.json
-    config.client.vendors.manifest //vendors
+    config.client.ts.tsconfig
   )) {
     logSkip('ts');
     return done();
@@ -526,6 +524,9 @@ function watchCats() {
  * @param {Function} callback
  */
 function forEachVendor(callback) {
+  if (!config.client.vendors.manifest) {
+    return;
+  }
   const pkg = require(config.client.vendors.manifest);
   Object.keys(pkg.dependencies).forEach((vendor) => {
     if (!config.client.vendors.test(vendor)) {
