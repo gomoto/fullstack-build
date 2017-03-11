@@ -772,7 +772,7 @@ function watchImages() {
   logClient('watching images');
   gulp.watch(path.join(config.resources.images.from, '**/*'), (event) => {
     logClientWatchEvent(event);
-    config.client.images.watch.pre(event);
+    config.resources.images.watch.pre(event);
     cleanImages(() => {
       buildImages(() => {
         rebuildHtml(() => {
