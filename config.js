@@ -126,9 +126,8 @@ module.exports = function(config) {
     // TODO: Make config file path configurable.
     customConfig = require(path.join(config.src, 'fullstack.config'))(config);
   } catch (e) {
-    // TODO: This should exit with non-zero code.
-    console.warn('Config file not found or invalid', e);
-    customConfig = {};
+    console.error('Config file not found or invalid');
+    throw new Error(e);
   }
 
   return deepExtend({}, emptyConfig, customConfig);
