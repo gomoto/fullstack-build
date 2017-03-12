@@ -29,17 +29,8 @@ const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 const wiredep = require('wiredep');
 
-// Absolute paths
-const internalConfig = {
-  src: '/src',
-  build: '/build'
-};
-
 // Provide copy of internal config
-const config = require('./config')({
-  src: internalConfig.src,
-  build: internalConfig.build
-});
+const config = require('./config')();
 const noop = Function.prototype;
 
 const DockerServiceFactory = require('./docker-service');
@@ -69,20 +60,16 @@ function hashGlob(filepath) {
  */
 function removePath(entity, done) {
   done = done || noop;
-  // If you need to go to parent of build directory to get to entity, then
-  // entity is not inside build directory. This check also works on globs.
-  if (path.relative(internalConfig.build, entity).slice(0,2) === '..') {
-    throw new Error('entity must live inside build directory');
-  }
   rimraf(entity, () => {
-    // Remove empty directories until build  directory is reached.
-    removeEmptyDirectory(path.dirname(entity), internalConfig.build);
+    // Remove empty directories until root is reached.
+    removeEmptyDirectory(path.dirname(entity), '/');
     done();
   });
 }
 
 /**
- * Remove empty directories until non-empty or root directory is reached.
+ * Remove empty directories until we reach a non-empty directory, an unremovable
+ * directory (e.g., mounted volume), or the root directory.
  */
 function removeEmptyDirectory(current, root) {
   // Don't remove root directory.
@@ -98,8 +85,14 @@ function removeEmptyDirectory(current, root) {
   if (contents.length > 0) {
     return;
   }
-  // Directory is empty. Remove it.
-  fs.rmdirSync(current);
+  // Directory is empty.
+  try {
+    // Remove directory.
+    fs.rmdirSync(current);
+  } catch (e) {
+    // Cannot remove mounted directories.
+    return;
+  }
   // Remove empty parent directory.
   removeEmptyDirectory(path.dirname(current), root);
 }
@@ -1056,11 +1049,11 @@ function writeGitCommit(done) {
     return done();
   }
   console.log(`Writing latest git commit to ${config.gitCommit}`);
-  const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
-  fsExtra.outputFile(config.gitCommit, commit, (err) => {
-    if (err) console.log(err);
-    done();
-  });
+  // const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
+  // fsExtra.outputFile(config.gitCommit, commit, (err) => {
+  //   if (err) console.log(err);
+  //   done();
+  // });
 }
 
 function cleanGitCommit(done) {
