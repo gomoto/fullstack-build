@@ -7,6 +7,6 @@ Container for building/watching client code, server code, and resources.
 
 ## Configuration
 
-`fullstack.config.js`
+Mount configuration file at `/fullstack.config.js`
 
 **[All configuration options](https://github.com/gomoto/fullstack-build/blob/master/config.js)**
