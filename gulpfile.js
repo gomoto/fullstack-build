@@ -1044,25 +1044,28 @@ function cleanServer(done) {
 
 function writeGitCommit(done) {
   done = done || noop;
-  if (!config.gitCommit) {
-    logSkip('gitCommit');
+  if (!(
+    config.git.commit &&
+    config.git.directory
+  )) {
+    logSkip('git-commit');
     return done();
   }
-  console.log(`Writing latest git commit to ${config.gitCommit}`);
-  // const commit = child_process.execSync(`cd ${internalConfig.src} && git rev-parse HEAD`);
-  // fsExtra.outputFile(config.gitCommit, commit, (err) => {
-  //   if (err) console.log(err);
-  //   done();
-  // });
+  console.log(`Writing latest git commit to ${config.git.commit}`);
+  const commit = child_process.execSync(`cd ${path.dirname(config.git.directory)} && git rev-parse HEAD`);
+  fsExtra.outputFile(config.git.commit, commit, (err) => {
+    if (err) console.log(err);
+    done();
+  });
 }
 
 function cleanGitCommit(done) {
   done = done || noop;
-  if (!config.gitCommit) {
-    logSkip('gitCommit-clean');
+  if (!config.git.commit) {
+    logSkip('git-commit-clean');
     return done();
   }
-  removePath(config.gitCommit, done);
+  removePath(config.git.commit, done);
 }
 
 

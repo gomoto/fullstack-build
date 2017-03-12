@@ -118,7 +118,10 @@ module.exports = function() {
       }
     },
     services: {},
-    gitCommit: ''
+    git: {
+      directory: '',
+      commit: ''
+    }
   };
 
   let customConfig;
