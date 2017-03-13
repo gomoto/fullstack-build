@@ -4,7 +4,7 @@ const noop = Function.prototype;
 
 // All paths are relative to this container,
 // even if defined within config file.
-module.exports = function() {
+module.exports = function(config) {
   const emptyConfig = {
     client: {
       html: {
@@ -126,7 +126,7 @@ module.exports = function() {
 
   let customConfig;
   try {
-    customConfig = require(process.env.FULLSTACK_CONFIG || '/fullstack.config')();
+    customConfig = require(config.file)();
   } catch (e) {
     console.error('Config file not found or invalid');
     throw new Error(e);

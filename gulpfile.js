@@ -30,7 +30,9 @@ const uglify = require('gulp-uglify');
 const wiredep = require('wiredep');
 
 // Provide copy of internal config
-const config = require('./config')();
+const config = require('./config')({
+  file: process.env.FULLSTACK_CONFIG
+});
 const noop = Function.prototype;
 
 const DockerServiceFactory = require('./docker-service');
