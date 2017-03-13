@@ -29,7 +29,6 @@ const typescript = require('gulp-typescript');
 const uglify = require('gulp-uglify');
 const wiredep = require('wiredep');
 
-// Provide copy of internal config
 const config = require('./config')({
   file: process.env.FULLSTACK_CONFIG
 });
@@ -119,6 +118,7 @@ function removeEmptyDirectory(current, root) {
 //     done();
 //   });
 // }
+
 
 
 /**
@@ -844,35 +844,6 @@ function cleanClient(done) {
 
 
 /**
- * Copy server node_modules to build directory.
- */
-// function copyNodeModules(done) {
-//  done = done || noop;
-//  let skip = false;
-//  if (!config.server.node_modules.from) {
-//    console.log('undefined: config.server.node_modules.from');
-//    skip = true;
-//  }
-//  if (!config.server.node_modules.to) {
-//    console.log('undefined: config.server.node_modules.to');
-//    skip = true;
-//  }
-//  if (skip) {
-//    logSkip('server node_modules');
-//    return done();
-//  }
-//  timeServer('copy-node-modules');
-//  fsExtra.copy(config.server.node_modules.from, config.server.node_modules.to, (err) => {
-//    if (err) {
-//      console.error(err);
-//      return done(err);
-//    }
-//    timeEndServer('copy-node-modules');
-//    done();
-//  });
-// }
-
-/**
  * Server JavaScript
  */
 
@@ -924,55 +895,6 @@ function buildServerJs(done, includeMaps) {
   });
 }
 
-
-
-/**
- * Build server files.
- * @param {Function} done called after all server files are written to disk
- */
-function buildServer(done, includeMaps) {
-  if (includeMaps) console.log('building server with sourcemaps');
-  done = done || noop;
-  logServer('building...');
-  timeServer('build');
-  async.parallel([
-    // copyNodeModules,
-    (then) => buildServerJs(then, includeMaps)
-  ], () => {
-    timeEndServer('build');
-    done();
-  });
-}
-
-
-
-/**
- * Watch each build cycle independently.
- */
-function watchServer(includeMaps) {
-  // watchServerNodeModules();
-  watchServerJs(includeMaps);
-  config.server.watch.init(services);
-}
-
-
-// function watchServerNodeModules() {
-//   if (!config.server.node_modules.watch.glob) {
-//     return;
-//   }
-//   logServer('watching server node_modules');
-//   gulp.watch(config.server.node_modules.watch.glob, (event) => {
-//     logServerWatchEvent(event);
-//     config.server.node_modules.watch.pre(event);
-//     cleanNodeModules(() => {
-//       copyNodeModules(() => {
-//         config.server.node_modules.watch.post(event, services);
-//       });
-//     });
-//   });
-//   config.server.node_modules.watch.init(services);
-// }
-
 /**
  * Watch server typescript files.
  * Rebuild server typescript files with sourcemaps.
@@ -996,19 +918,6 @@ function watchServerJs(includeMaps) {
   config.server.ts.watch.init(services);
 }
 
-// function cleanNodeModules(done) {
-//   done = done || noop;
-//   if (!config.server.node_modules.to) {
-//     logSkip('server node_modules clean');
-//     return done();
-//   }
-//   timeServer('node_modules clean');
-//   removePath(config.server.node_modules.to, () => {
-//     timeEndServer('node_modules clean');
-//     done();
-//   });
-// }
-
 /**
  * Clean server js files.
  * @param {Function} done
@@ -1026,6 +935,37 @@ function cleanServerJs(done) {
   });
 }
 
+
+
+/**
+ * Server
+ */
+
+/**
+ * Build server files.
+ * @param {Function} done called after all server files are written to disk
+ */
+function buildServer(done, includeMaps) {
+  if (includeMaps) console.log('building server with sourcemaps');
+  done = done || noop;
+  logServer('building...');
+  timeServer('build');
+  async.parallel([
+    (then) => buildServerJs(then, includeMaps)
+  ], () => {
+    timeEndServer('build');
+    done();
+  });
+}
+
+/**
+ * Watch each build cycle independently.
+ */
+function watchServer(includeMaps) {
+  watchServerJs(includeMaps);
+  config.server.watch.init(services);
+}
+
 /**
  * Clean server files.
  * @param {Function} done
@@ -1033,7 +973,6 @@ function cleanServerJs(done) {
 function cleanServer(done) {
   done = done || noop;
   async.parallel([
-    // cleanNodeModules,
     cleanServerJs
   ], done);
 }
@@ -1073,6 +1012,35 @@ function cleanGitCommit(done) {
 
 
 /**
+ * Copy
+ */
+
+function copyStuff(done) {
+  done = done || noop;
+  if (!config.copy) return;
+  console.time('copy');
+  const tasks = config.copy.map((copyConfig) => {
+    return (then) => {
+      if (!(
+        copyConfig.src &&
+        copyConfig.dest
+      )) {
+        return then(new Error('copy task requires src and dest'));
+      }
+      gulp.src(copyConfig.src)
+      .pipe(gulp.dest(copyConfig.dest))
+      .on('finish', then);
+    };
+  });
+  async.parallel(tasks, (err) => {
+    if (err) return done(err);
+    console.timeEnd('copy');
+    done();
+  });
+}
+
+
+/**
  * App
  */
 
@@ -1082,6 +1050,7 @@ function build(done, includeMaps) {
   async.parallel([
     buildClient,
     (then) => buildServer(then, !!includeMaps),
+    copyStuff,
     writeGitCommit
   ], done);
 }

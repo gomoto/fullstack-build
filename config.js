@@ -6,6 +6,9 @@ const noop = Function.prototype;
 // even if defined within config file.
 module.exports = function(config) {
   const emptyConfig = {
+    // List of copy configuration objects. Each object should have src and dest.
+    // The format of src and dest follows gulp.src and gulp.dest rules.
+    copy: [],
     client: {
       html: {
         entry: '',
