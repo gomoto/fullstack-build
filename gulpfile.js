@@ -1073,6 +1073,35 @@ function cleanGitCommit(done) {
 
 
 /**
+ * Copy
+ */
+
+function copyStuff(done) {
+  done = done || noop;
+  if (!config.copy) return;
+  console.time('copy');
+  const tasks = config.copy.map((copyConfig) => {
+    return (then) => {
+      if (!(
+        copyConfig.src &&
+        copyConfig.dest
+      )) {
+        return then(new Error('copy task requires src and dest'));
+      }
+      gulp.src(copyConfig.src)
+      .pipe(gulp.dest(copyConfig.dest))
+      .on('finish', then);
+    };
+  });
+  async.parallel(tasks, (err) => {
+    if (err) return done(err);
+    console.timeEnd('copy');
+    done();
+  });
+}
+
+
+/**
  * App
  */
 
@@ -1082,6 +1111,7 @@ function build(done, includeMaps) {
   async.parallel([
     buildClient,
     (then) => buildServer(then, !!includeMaps),
+    copyStuff,
     writeGitCommit
   ], done);
 }
