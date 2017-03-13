@@ -846,31 +846,31 @@ function cleanClient(done) {
 /**
  * Copy server node_modules to build directory.
  */
-function copyNodeModules(done) {
- done = done || noop;
- let skip = false;
- if (!config.server.node_modules.from) {
-   console.log('undefined: config.server.node_modules.from');
-   skip = true;
- }
- if (!config.server.node_modules.to) {
-   console.log('undefined: config.server.node_modules.to');
-   skip = true;
- }
- if (skip) {
-   logSkip('server node_modules');
-   return done();
- }
- timeServer('copy-node-modules');
- fsExtra.copy(config.server.node_modules.from, config.server.node_modules.to, (err) => {
-   if (err) {
-     console.error(err);
-     return done(err);
-   }
-   timeEndServer('copy-node-modules');
-   done();
- });
-}
+// function copyNodeModules(done) {
+//  done = done || noop;
+//  let skip = false;
+//  if (!config.server.node_modules.from) {
+//    console.log('undefined: config.server.node_modules.from');
+//    skip = true;
+//  }
+//  if (!config.server.node_modules.to) {
+//    console.log('undefined: config.server.node_modules.to');
+//    skip = true;
+//  }
+//  if (skip) {
+//    logSkip('server node_modules');
+//    return done();
+//  }
+//  timeServer('copy-node-modules');
+//  fsExtra.copy(config.server.node_modules.from, config.server.node_modules.to, (err) => {
+//    if (err) {
+//      console.error(err);
+//      return done(err);
+//    }
+//    timeEndServer('copy-node-modules');
+//    done();
+//  });
+// }
 
 /**
  * Server JavaScript
@@ -936,7 +936,7 @@ function buildServer(done, includeMaps) {
   logServer('building...');
   timeServer('build');
   async.parallel([
-    copyNodeModules,
+    // copyNodeModules,
     (then) => buildServerJs(then, includeMaps)
   ], () => {
     timeEndServer('build');
@@ -950,28 +950,28 @@ function buildServer(done, includeMaps) {
  * Watch each build cycle independently.
  */
 function watchServer(includeMaps) {
-  watchServerNodeModules();
+  // watchServerNodeModules();
   watchServerJs(includeMaps);
   config.server.watch.init(services);
 }
 
 
-function watchServerNodeModules() {
-  if (!config.server.node_modules.watch.glob) {
-    return;
-  }
-  logServer('watching server node_modules');
-  gulp.watch(config.server.node_modules.watch.glob, (event) => {
-    logServerWatchEvent(event);
-    config.server.node_modules.watch.pre(event);
-    cleanNodeModules(() => {
-      copyNodeModules(() => {
-        config.server.node_modules.watch.post(event, services);
-      });
-    });
-  });
-  config.server.node_modules.watch.init(services);
-}
+// function watchServerNodeModules() {
+//   if (!config.server.node_modules.watch.glob) {
+//     return;
+//   }
+//   logServer('watching server node_modules');
+//   gulp.watch(config.server.node_modules.watch.glob, (event) => {
+//     logServerWatchEvent(event);
+//     config.server.node_modules.watch.pre(event);
+//     cleanNodeModules(() => {
+//       copyNodeModules(() => {
+//         config.server.node_modules.watch.post(event, services);
+//       });
+//     });
+//   });
+//   config.server.node_modules.watch.init(services);
+// }
 
 /**
  * Watch server typescript files.
@@ -996,18 +996,18 @@ function watchServerJs(includeMaps) {
   config.server.ts.watch.init(services);
 }
 
-function cleanNodeModules(done) {
-  done = done || noop;
-  if (!config.server.node_modules.to) {
-    logSkip('server node_modules clean');
-    return done();
-  }
-  timeServer('node_modules clean');
-  removePath(config.server.node_modules.to, () => {
-    timeEndServer('node_modules clean');
-    done();
-  });
-}
+// function cleanNodeModules(done) {
+//   done = done || noop;
+//   if (!config.server.node_modules.to) {
+//     logSkip('server node_modules clean');
+//     return done();
+//   }
+//   timeServer('node_modules clean');
+//   removePath(config.server.node_modules.to, () => {
+//     timeEndServer('node_modules clean');
+//     done();
+//   });
+// }
 
 /**
  * Clean server js files.
@@ -1033,8 +1033,8 @@ function cleanServerJs(done) {
 function cleanServer(done) {
   done = done || noop;
   async.parallel([
-    cleanServerJs,
-    cleanNodeModules
+    // cleanNodeModules,
+    cleanServerJs
   ], done);
 }
 
