@@ -126,7 +126,7 @@ module.exports = function() {
 
   let customConfig;
   try {
-    customConfig = require('/fullstack.config')();
+    customConfig = require(process.env.FULLSTACK_CONFIG || '/fullstack.config')();
   } catch (e) {
     console.error('Config file not found or invalid');
     throw new Error(e);
