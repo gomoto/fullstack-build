@@ -118,13 +118,15 @@ module.exports = function(config) {
       }
     },
     services: {},
-    gitCommit: ''
+    git: {
+      directory: '',
+      commit: ''
+    }
   };
 
   let customConfig;
   try {
-    // TODO: Make config file path configurable.
-    customConfig = require(path.join(config.src, 'fullstack.config'))(config);
+    customConfig = require(config.file)();
   } catch (e) {
     console.error('Config file not found or invalid');
     throw new Error(e);
