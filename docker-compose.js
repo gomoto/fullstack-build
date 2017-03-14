@@ -55,6 +55,11 @@ class DockerCompose {
     if (this._options.file) {
       composeArgs.push('--file', this._options.file);
     }
+    if (this._options.files) {
+      this._options.files.forEach((file) => {
+        composeArgs.push('--file', file);
+      });
+    }
     if (this._options.project) {
       composeArgs.push('--project-name', this._options.project);
     }
