@@ -720,13 +720,15 @@ function buildImages(done) {
   if (!(
     config.resources.images.from &&
     config.resources.images.to &&
+    config.resources.images.extensions &&
     config.resources.images.manifest
   )) {
     logSkip('images');
     return done();
   }
   timeClient('images build');
-  return gulp.src(path.join(config.resources.images.from, '**/*.{gif,jpg,png,svg}'))
+  const extensions = config.resources.images.extensions.join(',');
+  return gulp.src(path.join(config.resources.images.from, `**/*.{${extensions}}`))
   .pipe(imagemin())
   .pipe(rev())
   .pipe(gulp.dest(config.resources.images.to))
