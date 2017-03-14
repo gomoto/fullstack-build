@@ -1,6 +1,6 @@
 {
   "name": "fullstack-build",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "scripts": {
     "version": "git add -A",
     "postversion": "git push origin head && git push --tags"
