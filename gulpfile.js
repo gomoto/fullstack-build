@@ -726,7 +726,7 @@ function buildImages(done) {
     return done();
   }
   timeClient('images build');
-  return gulp.src(path.join(config.resources.images.from, '**/*'))
+  return gulp.src(path.join(config.resources.images.from, '**/*.{gif,jpg,png,svg}'))
   .pipe(imagemin())
   .pipe(rev())
   .pipe(gulp.dest(config.resources.images.to))
