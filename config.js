@@ -111,6 +111,7 @@ module.exports = function(config) {
       images: {
         from: '',
         to: '',
+        extensions: ['gif', 'jpg', 'png', 'svg'],
         manifest: '',
         watch: {
           // glob: '',
